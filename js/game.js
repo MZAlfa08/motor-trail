@@ -20,10 +20,12 @@ resize();
 
 /* ---------- medan & rintangan ---------- */
 const amp = x => Math.min(1.35, Math.max(0, (x - 300) / 1500));
-const gy = x => 420 + (55 * Math.sin(x * .004) + 28 * Math.sin(x * .011 + 1) + 40 * Math.sin(x * .0023 + 3)) * amp(x);
-const slopeAt = x => Math.atan2(gy(x + 4) - gy(x - 4), 8);
 const spikes = [];
 for (let i = 0; 1300 + i * 700 < GOAL - 400; i++) spikes.push(1300 + i * 700 + (i * 137) % 220);
+// Rampa lompat: naik 100 unit lalu terputus, tepat sebelum tiap semak berduri
+const ramp = x => { for (const sx of spikes) { const a = sx - 370, e = sx - 50; if (x > a && x < e) { const t = (x - a) / (e - a); return 100 * t * t; } } return 0; };
+const gy = x => 420 + (55 * Math.sin(x * .004) + 28 * Math.sin(x * .011 + 1) + 40 * Math.sin(x * .0023 + 3)) * amp(x) - ramp(x);
+const slopeAt = x => Math.atan2(gy(x + 4) - gy(x - 4), 8);
 
 /* ---------- state ---------- */
 const K = { gas: 0, brake: 0, fwd: 0, back: 0 };
