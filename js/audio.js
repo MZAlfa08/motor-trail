@@ -29,12 +29,12 @@ const Sfx = (() => {
     tone(lead[i], .22, 'square', .035);
     if (i % 2 === 0) tone(bass[i], .4, 'triangle', .09);
   }
-  function engine(ratio, gas) {
+  function engine(ratio, gas, nos) {
     if (!ac) return;
     const t = ac.currentTime;
-    eng.frequency.setTargetAtTime(45 + ratio * 120 + (gas ? 25 : 0), t, .08);
+    eng.frequency.setTargetAtTime(45 + ratio * 120 + (gas ? 25 : 0) + (nos ? 70 : 0), t, .08);
     filt.frequency.setTargetAtTime(300 + ratio * 800, t, .1);
-    engG.gain.setTargetAtTime(gas ? .13 : .06, t, .1);
+    engG.gain.setTargetAtTime(gas || nos ? .13 : .06, t, .1);
   }
   function stopEngine() { if (ac) engG.gain.setTargetAtTime(0, ac.currentTime, .05); }
   function crash() {
@@ -45,6 +45,7 @@ const Sfx = (() => {
     s.buffer = buf; g.gain.value = .5; s.connect(g); g.connect(master); s.start();
     tone(90, .4, 'sawtooth', .2);
   }
+  function coin() { tone(880, .08, 'square', .06); tone(1320, .12, 'square', .06, .06); }
   function land() { tone(120, .12, 'sine', .25); }
   function win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, .3, 'square', .08, i * .13)); }
   function toggleMute() {
@@ -52,5 +53,5 @@ const Sfx = (() => {
     if (master) master.gain.value = muted ? 0 : .6;
     return muted;
   }
-  return { init, engine, stopEngine, crash, land, win, toggleMute };
+  return { init, coin, engine, stopEngine, crash, land, win, toggleMute };
 })();
