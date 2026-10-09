@@ -3,7 +3,7 @@
 const cv = document.getElementById('game'), ctx = cv.getContext('2d');
 const $ = id => document.getElementById(id);
 let GOAL = 9000;
-const R = 17, L = 44, GRAV = 900, ACC = 560, MAXV = 620, NOSACC = 900, NOSMAX = 880;
+const R = 24, L = 62, GRAV = 900, ACC = 560, MAXV = 620, NOSACC = 900, NOSMAX = 880;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
@@ -38,7 +38,7 @@ const ramp = x => { for (const o of obs) { const e = o.x - o.hw - 16, a = e - 32
 const g0 = x => 420 + (55 * Math.sin(x * .004 + lv.ph) + 28 * Math.sin(x * .011 + 1 + lv.ph) + 40 * Math.sin(x * .0023 + 3 + lv.ph)) * amp(x) - ramp(x);
 const gy = x => { for (const o of holes) if (x > o.x0 && x < o.x1) return o.dy; return g0(x); };
 const inHole = x => holes.some(o => x > o.x0 - 30 && x < o.x1 + 30);
-const slopeAt = x => Math.atan2(gy(x + 4) - gy(x - 4), 8);
+const slopeAt = x => Math.atan2(g0(x + 4) - g0(x - 4), 8);
 function loadLevel(n) {
   level = n; lv = LEVELS[n]; GOAL = lv.goal; obs = []; holes = [];
   for (let i = 0; 1300 + i * lv.gap < GOAL - 400; i++) { const t = lv.obs[i % lv.obs.length]; obs.push(Object.assign({ t, x: 1300 + i * lv.gap + (i * 137) % 160 }, OB[t])); }
@@ -127,7 +127,7 @@ function update(dt) {
   const pen = Math.max(ry + R - gy(rx), fy + R - gy(fx));
   if (pen > 0) b.y -= pen;
   if (pen > -3) {
-    const sl = Math.atan2(gy(fx) - gy(rx), fx - rx), tx = Math.cos(sl), ty = Math.sin(sl);
+    const sl = Math.atan2(g0(fx) - g0(rx), fx - rx), tx = Math.cos(sl), ty = Math.sin(sl);
     const away = b.vx * ty - b.vy * tx;
     if (away <= 40) {
       if (pen <= 0) b.y -= pen;
@@ -148,8 +148,8 @@ function update(dt) {
   if (dead) b.a += b.av * dt;
 
   if (!dead && state === 'play') {
-    const hx = b.x + 46 * s, hy = b.y - 46 * c;          // kepala pengendara
-    if (hy + 8 > gy(hx)) crash();
+    const K = R / 17, hx = b.x + 6 * K * c + 52 * K * s, hy = b.y + 6 * K * s - 52 * K * c;   // kepala pengendara
+    if (hy + 11 * K > gy(hx)) crash();
     if (nosOn) for (let k = 0; k < 2; k++) parts.push({ x: rx - 6 * c, y: ry - 6 * s - 6, vx: -260 * c + b.vx * .3 + (Math.random() - .5) * 60,
       vy: -260 * s + (Math.random() - .5) * 60, life: .5, c: k ? '#ffd35c' : '#f0541e', f: 1 });
     maxX = Math.max(maxX, b.x);
@@ -211,40 +211,44 @@ function limb(pts, col, w) {
   ctx.strokeStyle = '#fff'; ctx.lineWidth = w + 5; ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke();
 }
 function wheel(x, y, rot) {
-  ctx.beginPath(); ctx.arc(x, y, R + 2.5, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
-  ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fillStyle = '#23201d'; ctx.fill();
-  ctx.setLineDash([3, 3.5]); ctx.lineDashOffset = -rot * R; ctx.strokeStyle = '#5a544e'; ctx.lineWidth = 3;      // ban bergerigi
-  ctx.beginPath(); ctx.arc(x, y, R - 1.6, 0, 7); ctx.stroke(); ctx.setLineDash([]);
-  ctx.beginPath(); ctx.arc(x, y, R - 5, 0, 7); ctx.fillStyle = '#f3e7c0'; ctx.fill(); ctx.strokeStyle = '#6a5d45'; ctx.lineWidth = 1; ctx.stroke();
-  ctx.beginPath(); for (let i = 0; i < 8; i++) { const a = rot + i * Math.PI / 4; ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * (R - 5), y + Math.sin(a) * (R - 5)); }
-  ctx.strokeStyle = '#8a7d62'; ctx.stroke();
-  ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.strokeStyle = '#b9bec4'; ctx.lineWidth = 1.5; ctx.stroke();      // cakram rem
-  ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fillStyle = '#9aa0a6'; ctx.fill();
+  const r = 17;
+  ctx.beginPath(); ctx.arc(x, y, r + 2.5, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = '#1e1b19'; ctx.fill();
+  ctx.setLineDash([4, 3]); ctx.lineDashOffset = -rot * r; ctx.strokeStyle = '#4a4540'; ctx.lineWidth = 3.5;   // ban bergerigi tebal
+  ctx.beginPath(); ctx.arc(x, y, r - 1.8, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(x, y, r - 6.5, 0, 7); ctx.fillStyle = '#f6efd6'; ctx.fill(); ctx.strokeStyle = '#7d7358'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = rot + i * Math.PI / 5; ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * (r - 6.5), y + Math.sin(a) * (r - 6.5)); }
+  ctx.strokeStyle = '#a89c78'; ctx.lineWidth = 1.2; ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, 7.5, 0, 7); ctx.strokeStyle = '#b9bec4'; ctx.lineWidth = 1.6; ctx.stroke();    // cakram rem
+  ctx.beginPath(); ctx.arc(x, y, 3.5, 0, 7); ctx.fillStyle = '#8f959b'; ctx.fill();
 }
 function drawBike() {
-  ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a);
-  const hl = L / 2, O = '#f0541e', G = '#7ed321', D = '#2a2118';
+  const K = R / 17, hl = 22, O = '#f0541e', O2 = '#c93a10', G = '#7ed321', D = '#2a2118', S1 = '#c9ced3';
+  ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); ctx.scale(K, K);
   wheel(-hl, 0, b.wr); wheel(hl, 0, b.wr);
-  ctx.beginPath(); ctx.arc(hl, 0, R + 4, -2.5, -.55); ctx.lineCap = 'round';                                   // spakbor depan
-  ctx.strokeStyle = '#fff'; ctx.lineWidth = 9; ctx.stroke(); ctx.strokeStyle = O; ctx.lineWidth = 5; ctx.stroke();
-  limb([[hl, 0], [hl - 8, -26]], '#c9ced3', 4);                       // garpu
-  limb([[-hl, 0], [-6, -8]], '#4a4540', 4);                           // swing arm
-  limb([[-14, -6], [-36, -9]], '#c9ced3', 3);                         // knalpot
-  poly([[-12, -16], [6, -16], [8, -4], [-10, -3]], '#b8bec5');         // mesin
-  poly([[-30, -15], [-14, -23], [6, -25], [17, -19], [21, -10], [8, -7], [-14, -9]], O); // badan
-  poly([[-38, -13], [-22, -18], [-17, -12], [-35, -8]], '#fff');       // spakbor belakang
-  limb([[-28, -20], [-8, -25]], D, 5);                                // jok
-  limb([[hl - 8, -26], [hl - 14, -33], [hl - 20, -34]], D, 3);        // stang
-  poly([[17, -36], [27, -34], [28, -27], [18, -28]], '#fff');          // pelat nomor
-  limb([[-8, -24], [4, -16], [6, -6]], O, 7);                         // kaki
-  poly([[2, -9], [11, -9], [12, -2], [2, -2]], G);                    // sepatu
-  limb([[-8, -24], [-1, -45]], O, 11);                                // badan pengendara
-  limb([[-2, -40], [8, -36], [hl - 14, -33]], O, 6);                  // lengan
-  part(() => ctx.arc(hl - 14, -33, 4, 0, 7), G, 3);                   // sarung tangan
-  part(() => ctx.arc(2, -52, 11, 0, 7), O, 5);                        // helm
-  ctx.beginPath(); ctx.arc(2, -52, 8.5, -2.7, -1.2); ctx.strokeStyle = G; ctx.lineWidth = 3; ctx.stroke();
-  part(() => ctx.ellipse(8, -51, 6.5, 5, 0, 0, 7), '#2f8fe0', 3);     // visor
-  ctx.beginPath(); ctx.ellipse(10, -53, 2.2, 1.3, 0, 0, 7); ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(hl, 0, 22, -2.5, -.55); ctx.lineCap = 'round';                                  // spakbor depan
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 10; ctx.stroke(); ctx.strokeStyle = O; ctx.lineWidth = 5.5; ctx.stroke();
+  limb([[-hl, 0], [-4, -8]], '#55504a', 5);                           // swing arm
+  limb([[-18, -4], [-10, -22]], O2, 5);                               // peredam belakang
+  limb([[-4, -9], [-36, -13]], S1, 4);                                // knalpot
+  poly([[-12, -18], [8, -18], [10, -4], [-12, -2]], '#b8bec5');        // mesin
+  part(() => ctx.arc(-1, -10, 4, 0, 7), '#8f959b', 3);
+  poly([[-40, -22], [-26, -27], [-6, -27], [-3, -15], [-22, -13], [-34, -14]], O);   // ekor
+  limb([[-30, -26], [-8, -29]], D, 5);                                // jok
+  poly([[-8, -26], [12, -32], [24, -24], [18, -12], [4, -14]], O);     // tangki
+  limb([[hl, 0], [14, -30]], S1, 6);                                  // garpu tebal
+  limb([[14, -30], [6, -37], [1, -37]], D, 4);                        // stang
+  poly([[22, -41], [31, -38], [31, -30], [23, -32]], '#fff');          // pelat nomor
+  limb([[-10, -26], [8, -22], [3, -6]], O, 9);                        // kaki
+  part(() => ctx.ellipse(8, -22, 5, 4, 0, 0, 7), G, 3);               // lutut
+  poly([[-4, -11], [10, -11], [13, 0], [-4, 0]], G, 5);                // sepatu besar
+  limb([[-10, -26], [3, -46]], O, 14);                                // badan condong ke depan
+  limb([[1, -47], [14, -41], [5, -35]], O, 7);                        // lengan
+  part(() => ctx.arc(5, -35, 5, 0, 7), G, 3);                         // sarung tangan
+  part(() => ctx.arc(8, -58, 14, 0, 7), O, 5);                        // helm besar
+  ctx.beginPath(); ctx.arc(8, -58, 11, -2.8, -1.3); ctx.strokeStyle = G; ctx.lineWidth = 3.5; ctx.stroke();
+  part(() => ctx.ellipse(16, -56, 9, 7, 0, 0, 7), '#2f8fe0', 3);      // visor besar
+  ctx.beginPath(); ctx.ellipse(19, -58, 3, 1.8, 0, 0, 7); ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fill();
   ctx.restore();
 }
 function cactus(x, y, k) { ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.strokeStyle = '#3f8f45'; ctx.lineCap = 'round'; ctx.lineWidth = 16;
@@ -343,7 +347,7 @@ function draw() {
   }
   if (!b.g && state !== 'menu') {   // bayangan di tanah: penanda titik pendaratan
     const gg = gy(b.x), hg = gg - b.y;
-    ctx.fillStyle = 'rgba(0,0,0,' + clamp(.35 - hg / 900, .1, .35) + ')'; ctx.beginPath(); ctx.ellipse(b.x, gg + 1, 30, 5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,' + clamp(.35 - hg / 900, .1, .35) + ')'; ctx.beginPath(); ctx.ellipse(b.x, gg + 1, 42, 7, 0, 0, 7); ctx.fill();
   }
   drawBike();
   parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, 7, 7); });
