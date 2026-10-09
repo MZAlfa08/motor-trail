@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Moto Beach X</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div class="stat"><span id="time">0.0</span> dtk</div>
+  <div class="bar"><i id="prog"></i></div>
+  <button id="mute" aria-label="Suara">🔊</button>
+</div>
+
+<div id="overlay" class="show">
+  <h1><span>MOTO</span> <b>BEACH</b> <em>X</em></h1>
+  <p id="msg">Capai garis finis tanpa jatuh. Hindari duri dan mendaratlah dengan roda!</p>
+  <p id="best"></p>
+  <button id="play">Main</button>
+  <small class="keys">Panah / WASD: gas, rem, miring &nbsp;|&nbsp; R: ulangi</small>
+</div>
+
+<div id="touch">
+  <div class="grp">
+    <button data-k="back" aria-label="Miring belakang">⟲</button>
+    <button data-k="fwd" aria-label="Miring depan">⟳</button>
+  </div>
+  <div class="grp">
+    <button data-k="brake" aria-label="Rem">REM</button>
+    <button data-k="gas" class="gas" aria-label="Gas">GAS</button>
+  </div>
+</div>
+
+<script src="js/audio.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
