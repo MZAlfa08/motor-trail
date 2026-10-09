@@ -2,7 +2,8 @@
 'use strict';
 const cv = document.getElementById('game'), ctx = cv.getContext('2d');
 const $ = id => document.getElementById(id);
-const GOAL = 9000, R = 17, L = 44, GRAV = 900, ACC = 560, MAXV = 620, NOSACC = 900, NOSMAX = 880;
+let GOAL = 9000;
+const R = 17, L = 44, GRAV = 900, ACC = 560, MAXV = 620, NOSACC = 900, NOSMAX = 880;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
@@ -18,31 +19,49 @@ addEventListener('resize', resize);
 addEventListener('orientationchange', () => setTimeout(resize, 150));
 resize();
 
-/* ---------- medan & rintangan ---------- */
-const amp = x => Math.min(1.15, Math.max(0, (x - 300) / 1500));
-const spikes = [];
-for (let i = 0; 1300 + i * 700 < GOAL - 400; i++) spikes.push(1300 + i * 700 + (i * 137) % 220);
-// Rampa lompat: naik 100 unit lalu terputus, tepat sebelum tiap semak berduri
-const ramp = x => { for (const sx of spikes) { const a = sx - 370, e = sx - 50; if (x > a && x < e) { const t = (x - a) / (e - a); return 100 * t * t; } } return 0; };
-const gy = x => 420 + (55 * Math.sin(x * .004) + 28 * Math.sin(x * .011 + 1) + 40 * Math.sin(x * .0023 + 3)) * amp(x) - ramp(x);
+/* ---------- level & medan ---------- */
+const LEVELS = [
+  { name: 'Pantai', goal: 7000, amp: 1.0, ph: 0, gap: 700, obs: ['bush'], drag: .25, deco: 'palm', far: 'sea',
+    sky: ['#6fbdee', '#cfe9f5'], sun: '#ffd35c', farC: ['#2f9fd8', '#5fc4e8'], sand: ['#e8b866', '#d49a46', '#c98a36'], pit: '#2f9fd8' },
+  { name: 'Gurun', goal: 8000, amp: 1.1, ph: 2, gap: 650, obs: ['cactus', 'rock', 'cactus', 'cactus', 'rock'], drag: .25, deco: 'cactus', far: 'dune',
+    sky: ['#f6a95c', '#fde3b0'], sun: '#fff1c2', farC: ['#e6a766', '#d98f4e'], sand: ['#e9a24e', '#cf8638', '#b86f2c'], pit: '#8a4b1f' },
+  { name: 'Salju', goal: 8500, amp: 1.15, ph: 4, gap: 650, obs: ['ice', 'hole', 'ice', 'hole'], drag: .06, brake: 450, deco: 'pine', far: 'peak', snow: 1,
+    sky: ['#9db7d6', '#e8f1fa'], sun: '#ffffff', farC: ['#cfe0f0', '#8fa6c4'], sand: ['#f2f7fb', '#c7dcee', '#a9c6e0'], pit: '#2b4a73' },
+  { name: 'Gunung Api', goal: 9500, amp: 1.3, ph: 1, gap: 600, obs: ['ember', 'hole', 'rock', 'hole', 'ember'], drag: .25, deco: 'dead', far: 'peak', ash: 1,
+    sky: ['#3a1c1c', '#d0552b'], sun: '#ffb347', farC: ['#c2411c', '#2a1414'], sand: ['#5a3a32', '#3e2622', '#2a1816'], pit: '#ff5a1f' }
+];
+const OB = { bush: { hw: 34, ch: 18 }, cactus: { hw: 24, ch: 26 }, rock: { hw: 30, ch: 30 }, ice: { hw: 34, ch: 22 }, ember: { hw: 34, ch: 20 }, hole: { hw: 55, ch: 0 } };
+let lv, level = 0, obs = [], holes = [], coins = [];
+const amp = x => Math.min(lv.amp, Math.max(0, (x - 300) / 1500));
+// Rampa lompat: naik 100 unit lalu terputus, tepat sebelum tiap rintangan
+const ramp = x => { for (const o of obs) { const e = o.x - o.hw - 16, a = e - 320; if (x > a && x < e) { const t = (x - a) / (e - a); return 100 * t * t; } } return 0; };
+const g0 = x => 420 + (55 * Math.sin(x * .004 + lv.ph) + 28 * Math.sin(x * .011 + 1 + lv.ph) + 40 * Math.sin(x * .0023 + 3 + lv.ph)) * amp(x) - ramp(x);
+const gy = x => { for (const o of holes) if (x > o.x0 && x < o.x1) return o.dy; return g0(x); };
+const inHole = x => holes.some(o => x > o.x0 - 30 && x < o.x1 + 30);
 const slopeAt = x => Math.atan2(gy(x + 4) - gy(x - 4), 8);
-// koin berbentuk busur di atas tiap semak: jalur ideal lompatan
-const coins = spikes.flatMap(sx => [0, 1, 2, 3, 4].map(i => ({ x: sx - 30 + i * 30, y: gy(sx) - 120 - 30 * Math.sin(Math.PI * i / 4), got: 0 })));
+function loadLevel(n) {
+  level = n; lv = LEVELS[n]; GOAL = lv.goal; obs = []; holes = [];
+  for (let i = 0; 1300 + i * lv.gap < GOAL - 400; i++) { const t = lv.obs[i % lv.obs.length]; obs.push(Object.assign({ t, x: 1300 + i * lv.gap + (i * 137) % 160 }, OB[t])); }
+  holes = obs.filter(o => o.t === 'hole'); holes.forEach(o => { o.x0 = o.x - o.hw; o.x1 = o.x + o.hw; o.dy = g0(o.x0) + 240; });
+  coins = obs.flatMap(o => [0, 1, 2, 3, 4].map(i => ({ x: o.x + (o.t === 'hole' ? -60 : -30) + i * 30, y: g0(o.x) - 120 - 30 * Math.sin(Math.PI * i / 4), got: 0 })));
+}
+loadLevel(0);
 
 /* ---------- state ---------- */
 const K = { gas: 0, brake: 0, fwd: 0, back: 0, nos: 0 };
 let b, state = 'menu', t0 = 0, time = 0, camX = 0, camY = 0, parts = [], endTimer = 0;
-let bestScore = 0, bonus = 0, nitro = 60, airRot = 0, wheelT = 0, maxX = 120, passed = [];
-try { bestScore = +localStorage.getItem('motoBeachScore') || 0; } catch (e) {}
+let nextBtn = '', runScore = 0, nextN = 0, unlocked = 0, bestScore = 0, bonus = 0, nitro = 60, airRot = 0, wheelT = 0, maxX = 120, passed = [];
+try { bestScore = +localStorage.getItem('motoBeachScore') || 0; unlocked = Math.min(LEVELS.length - 1, +localStorage.getItem('motoBeachUnlock') || 0); } catch (e) {}
 const total = () => Math.floor(Math.max(0, maxX - 120) / 10) + bonus;
-function saveBest() { const t = total(); if (t > bestScore) { bestScore = t; try { localStorage.setItem('motoBeachScore', t); } catch (e) {} } }
+function saveBest() { const t = runScore + total(); if (t > bestScore) { bestScore = t; try { localStorage.setItem('motoBeachScore', t); } catch (e) {} } }
 function pop(t) { const d = document.createElement('div'); d.textContent = t; $('pop').appendChild(d); setTimeout(() => d.remove(), 1100); }
 
 function newBike() { return { x: 120, y: gy(120) - R - 2, vx: 0, vy: 0, a: 0, av: 0, g: true, wr: 0 }; }
-function start() {
-  b = newBike(); parts = []; state = 'play'; t0 = performance.now(); time = 0;
+function start(n) {
+  loadLevel(n); b = newBike(); parts = []; state = 'play'; t0 = performance.now(); time = 0;
   bonus = 0; nitro = 60; airRot = 0; wheelT = 0; maxX = 120; passed = []; coins.forEach(c => c.got = 0);
   $('overlay').classList.remove('show'); Sfx.init();
+  $('lvname').textContent = 'Level ' + (n + 1) + ' · ' + lv.name; pop('LEVEL ' + (n + 1) + ' · ' + lv.name.toUpperCase());
 }
 b = newBike();
 
@@ -55,12 +74,27 @@ function crash() {
 function finish() {
   state = 'done'; Sfx.stopEngine(); Sfx.win();
   const tb = Math.max(0, Math.round((120 - time) * 10)); bonus += tb; saveBest();
-  showOverlay('Selesai! 🏁', 'Skor ' + total() + ' (bonus waktu +' + tb + ')', 'Main lagi');
+  runScore += total(); bonus = 0; maxX = 120;
+  if (level < LEVELS.length - 1) {
+    unlocked = Math.max(unlocked, level + 1); try { localStorage.setItem('motoBeachUnlock', unlocked); } catch (e) {}
+    nextN = level + 1;
+    showOverlay('Level ' + (level + 1) + ' selesai! 🏁', 'Skor ' + runScore + ' (bonus waktu +' + tb + ')', 'Level berikutnya ▶');
+  } else {
+    nextN = 0; const fin = runScore; runScore = 0;
+    showOverlay('TAMAT! 🏆', 'Semua level selesai. Total skor ' + fin, 'Main dari awal');
+  }
+}
+function renderLevels() {
+  const box = $('levels'); box.innerHTML = '';
+  LEVELS.forEach((l, i) => {
+    const bt = document.createElement('button'); bt.textContent = i <= unlocked ? (i + 1) + '. ' + l.name : '🔒 ' + (i + 1);
+    bt.disabled = i > unlocked; bt.onclick = () => { runScore = 0; start(i); }; box.appendChild(bt);
+  });
 }
 function showOverlay(title, msg, btn) {
   $('msg').textContent = title + ' ' + msg;
   $('best').textContent = bestScore ? 'Skor terbaik: ' + bestScore : '';
-  $('play').textContent = btn; $('overlay').classList.add('show');
+  $('play').textContent = btn; nextBtn = btn; renderLevels(); $('overlay').classList.add('show');
 }
 
 /* ---------- update ---------- */
@@ -76,8 +110,8 @@ function update(dt) {
     const sl = slopeAt(b.x), tx = Math.cos(sl), ty = Math.sin(sl);
     let v = b.vx * tx + b.vy * ty;
     if (!dead && v < (nosOn ? NOSMAX : MAXV)) v += ((K.gas ? ACC : 0) + (nosOn ? NOSACC : 0)) * dt;
-    if (!dead && K.brake) v = v > 0 ? Math.max(0, v - 800 * dt) : Math.max(-120, v - 300 * dt);
-    v *= 1 - (dead ? 3 : .25) * dt;
+    if (!dead && K.brake) v = v > 0 ? Math.max(0, v - (lv.brake || 800) * dt) : Math.max(-120, v - 300 * dt);
+    v *= 1 - (dead ? 3 : lv.drag) * dt;
     v = clamp(v, -150, NOSMAX);
     b.vx = v * tx; b.vy = v * ty; b.wr += v / R * dt;
   } else {
@@ -119,13 +153,14 @@ function update(dt) {
     if (nosOn) for (let k = 0; k < 2; k++) parts.push({ x: rx - 6 * c, y: ry - 6 * s - 6, vx: -260 * c + b.vx * .3 + (Math.random() - .5) * 60,
       vy: -260 * s + (Math.random() - .5) * 60, life: .5, c: k ? '#ffd35c' : '#f0541e', f: 1 });
     maxX = Math.max(maxX, b.x);
-    for (let i = 0; i < spikes.length; i++) {
-      const sx = spikes[i];
-      if (!passed[i] && b.x > sx + 80) { passed[i] = 1; bonus += 500; nitro = Math.min(100, nitro + 25); pop('LEWAT DURI!  +500'); }
-      if (Math.abs(sx - b.x) > 80) continue;
+    for (let i = 0; i < obs.length; i++) {
+      const o = obs[i];
+      if (!passed[i] && b.x > o.x + 80) { passed[i] = 1; bonus += 500; nitro = Math.min(100, nitro + 25); pop('LEWAT RINTANGAN!  +500'); }
+      if (Math.abs(o.x - b.x) > 130) continue;
+      if (o.t === 'hole') { if (b.x > o.x0 - 6 && b.x < o.x1 + 6 && b.y > o.dy - 210) crash(); continue; }
       for (const wx of [rx, fx]) {
         const wy = wx === rx ? ry : fy;
-        if (Math.abs(wx - sx) < 34 && wy + R > gy(sx) - 18) crash();
+        if (Math.abs(wx - o.x) < o.hw && wy + R > gy(o.x) - o.ch) crash();
       }
     }
     for (const k of coins) {
@@ -135,13 +170,13 @@ function update(dt) {
     if (b.x >= GOAL) finish();
     Sfx.engine(Math.abs(b.vx) / MAXV, K.gas, nosOn);
   }
-  if (dead) { endTimer -= dt; if (endTimer <= 0) { state = 'over'; showOverlay('Jatuh!', 'Skor ' + total() + '. Coba lagi, jaga posisi motor saat mendarat.', 'Ulangi'); } }
+  if (dead) { endTimer -= dt; if (endTimer <= 0) { state = 'over'; nextN = level; showOverlay('Jatuh!', 'Skor ' + (runScore + total()) + '. Coba lagi, jaga posisi motor saat mendarat.', 'Ulangi'); } }
 
   parts.forEach(p => { if (!p.f) p.vy += GRAV * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * (p.f ? 2.2 : .8); });
   parts = parts.filter(p => p.life > 0);
 
   $('time').textContent = time.toFixed(1);
-  $('score').textContent = total(); $('nosbar').style.width = nitro + '%';
+  $('score').textContent = runScore + total(); $('nosbar').style.width = nitro + '%';
   $('prog').style.width = clamp((b.x - 120) / (GOAL - 120) * 100, 0, 100) + '%';
 }
 
@@ -194,46 +229,86 @@ function drawBike() {
   ctx.restore();
 }
 
+function cactus(x, y, k) { ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.strokeStyle = '#3f8f45'; ctx.lineCap = 'round'; ctx.lineWidth = 16;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -80); ctx.stroke(); ctx.lineWidth = 10; ctx.beginPath();
+  ctx.moveTo(0, -30); ctx.lineTo(-22, -30); ctx.lineTo(-22, -55); ctx.moveTo(0, -45); ctx.lineTo(22, -45); ctx.lineTo(22, -68); ctx.stroke(); ctx.restore(); }
+function pine(x, y, k) { ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.fillStyle = '#6b4a32'; ctx.fillRect(-5, -20, 10, 22);
+  for (let i = 0; i < 3; i++) { const w = 44 - i * 10, yy = -20 - i * 34;
+    ctx.fillStyle = '#2f6b4a'; ctx.beginPath(); ctx.moveTo(-w, yy); ctx.lineTo(0, yy - 52); ctx.lineTo(w, yy); ctx.fill();
+    ctx.fillStyle = '#f4f9fd'; ctx.beginPath(); ctx.moveTo(-w * .5, yy - 26); ctx.lineTo(0, yy - 52); ctx.lineTo(w * .5, yy - 26); ctx.fill(); } ctx.restore(); }
+function deadTree(x, y, k) { ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.strokeStyle = '#1c0f0f'; ctx.lineCap = 'round'; ctx.lineWidth = 10;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(4, -70); ctx.moveTo(4, -45); ctx.lineTo(30, -75); ctx.moveTo(2, -58); ctx.lineTo(-24, -90); ctx.stroke(); ctx.restore(); }
+function decor(px, i) {
+  const k = .9 + (i % 3) * .1, y = gy(px) + 4, y2 = gy(px + 260) + 2;
+  if (lv.deco === 'palm') { palm(px, y, k, i % 2 ? 1 : -1); umbrella(px + 260, y2, i % 2 ? '#ffc800' : '#2f9fd8'); }
+  else if (lv.deco === 'cactus') { cactus(px, y, k); cactus(px + 260, y2, .6); }
+  else if (lv.deco === 'pine') { pine(px, y, k); pine(px + 260, y2, .7); }
+  else { deadTree(px, y, k); deadTree(px + 260, y2, .7); }
+}
+function drawObs(o) {
+  const y = gy(o.x);
+  if (o.t === 'hole') { ctx.fillStyle = lv.pit; ctx.fillRect(o.x0, o.dy - 26, o.x1 - o.x0, 60); return; }
+  if (o.t === 'cactus') { cactus(o.x - 12, y + 2, .5); cactus(o.x + 12, y + 2, .42); return; }
+  if (o.t === 'rock') { ctx.fillStyle = '#7a6a5a'; ctx.beginPath(); ctx.moveTo(o.x - 34, y + 4); ctx.lineTo(o.x - 22, y - 26); ctx.lineTo(o.x + 4, y - 38);
+    ctx.lineTo(o.x + 30, y - 24); ctx.lineTo(o.x + 36, y + 4); ctx.fill(); ctx.fillStyle = '#9a8a78'; ctx.beginPath(); ctx.moveTo(o.x - 22, y - 26);
+    ctx.lineTo(o.x + 4, y - 38); ctx.lineTo(o.x - 2, y - 12); ctx.fill(); return; }
+  const c = { bush: ['#3d6b2a', '#2d4f1f'], ice: ['#9fd4f0', '#e8f7ff'], ember: ['#2a1816', '#ff5a1f'] }[o.t], h = o.t === 'ice' ? 30 : 24;
+  ctx.fillStyle = c[0]; ctx.beginPath(); ctx.ellipse(o.x, y - 4, 40, 9, 0, 0, 7); ctx.fill();
+  for (let dx = -34; dx <= 34; dx += 9) { const yy = gy(o.x + dx); ctx.fillStyle = c[1]; ctx.beginPath(); ctx.moveTo(o.x + dx - 5, yy); ctx.lineTo(o.x + dx, yy - h); ctx.lineTo(o.x + dx + 5, yy); ctx.fill(); }
+}
+function backdrop() {
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, lv.sky[0]); g.addColorStop(.6, lv.sky[1]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = lv.sun; ctx.beginPath(); ctx.arc(W * .1, H * .08, 60 * S + 20, 0, 7); ctx.fill();
+  const hy = (330 - camY * .5) * S;
+  ctx.fillStyle = lv.farC[0]; ctx.fillRect(0, hy, W, H - hy);
+  if (lv.far === 'sea') {
+    ctx.fillStyle = lv.farC[1]; ctx.fillRect(0, hy + 40 * S, W, 18 * S);
+    const sx = ((W * .6 - camX * .03 * S) % (W + 400 * S) + W + 400 * S) % (W + 400 * S) - 200 * S;
+    ctx.save(); ctx.translate(sx, hy); ctx.scale(S, S);
+    ctx.fillStyle = '#e9edf0'; ctx.fillRect(-90, -26, 180, 26); ctx.fillRect(-60, -42, 110, 16);
+    ctx.fillStyle = '#3a7bd5'; for (let i = -84; i < 84; i += 10) ctx.fillRect(i, -18, 5, 4);
+    ctx.fillStyle = '#d63a2f'; ctx.fillRect(-12, -58, 16, 16); ctx.restore();
+  } else {
+    const st = (lv.far === 'dune' ? 320 : 240) * S, off = (camX * .08 * S) % st;
+    ctx.fillStyle = lv.farC[1];
+    for (let x = -st - off; x < W + st; x += st) {
+      const k = Math.round((x + off) / st), h = (60 + (((k * 53) % 40) + 40) % 40 * 2) * S; ctx.beginPath(); ctx.moveTo(x, hy);
+      if (lv.far === 'dune') ctx.quadraticCurveTo(x + st / 2, hy - h, x + st, hy); else { ctx.lineTo(x + st / 2, hy - h * 1.8); ctx.lineTo(x + st, hy); }
+      ctx.fill();
+    }
+  }
+  if (lv.snow || lv.ash) {
+    const tt = performance.now() / 1000; ctx.fillStyle = lv.snow ? '#ffffff' : '#ffb347';
+    for (let i = 0; i < 40; i++) { const x = (i * 137.5 + tt * (lv.snow ? 20 : 10)) % W, y = lv.snow ? (i * 61 + tt * 60) % H : H - (i * 61 + tt * 40) % H;
+      ctx.fillRect(x, y, 2 + i % 3, 2 + i % 3); }
+  }
+}
 function draw() {
   const vw = W / S, vh = H / S;
   camX = b.x - vw * .3;
   camY += (b.y - vh * .62 - camY) * .12;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#6fbdee'); g.addColorStop(.6, '#cfe9f5');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#ffd35c'; ctx.beginPath(); ctx.arc(W * .1, H * .08, 60 * S + 20, 0, 7); ctx.fill();
-  const hy = (330 - camY * .5) * S;                                   // laut
-  ctx.fillStyle = '#2f9fd8'; ctx.fillRect(0, hy, W, H - hy);
-  ctx.fillStyle = '#5fc4e8'; ctx.fillRect(0, hy + 40 * S, W, 18 * S);
-  const sx = ((W * .6 - camX * .03 * S) % (W + 400 * S) + W + 400 * S) % (W + 400 * S) - 200 * S; // kapal
-  ctx.save(); ctx.translate(sx, hy); ctx.scale(S, S);
-  ctx.fillStyle = '#e9edf0'; ctx.fillRect(-90, -26, 180, 26); ctx.fillRect(-60, -42, 110, 16);
-  ctx.fillStyle = '#3a7bd5'; for (let i = -84; i < 84; i += 10) ctx.fillRect(i, -18, 5, 4);
-  ctx.fillStyle = '#d63a2f'; ctx.fillRect(-12, -58, 16, 16); ctx.restore();
+  backdrop();
 
   ctx.setTransform(dpr * S, 0, 0, dpr * S, -camX * dpr * S, -camY * dpr * S);
   const x0 = camX - 20, x1 = camX + vw + 20, bot = camY + vh + 20;
-  const pts = [];
+  const pts = [], xs = [];
   for (let x = Math.floor(x0 / 8) * 8; x <= x1 + 8; x += 8) pts.push([x, gy(x)]);
-  for (const sx of spikes) { const e = sx - 50; if (e > x0 - 10 && e < x1 + 10) pts.push([e - .01, gy(e - .01)], [e + .01, gy(e + .01)]); }
+  obs.forEach(o => { xs.push(o.x - o.hw - 16); if (o.t === 'hole') xs.push(o.x0, o.x1); });
+  xs.forEach(e => { if (e > x0 - 10 && e < x1 + 10) pts.push([e - .01, gy(e - .01)], [e + .01, gy(e + .01)]); });
   pts.sort((p, q) => p[0] - q[0]);
-  ctx.fillStyle = '#e8b866'; ctx.beginPath(); ctx.moveTo(pts[0][0], bot);
+  ctx.fillStyle = lv.sand[0]; ctx.beginPath(); ctx.moveTo(pts[0][0], bot);
   pts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.lineTo(pts[pts.length - 1][0], bot); ctx.closePath(); ctx.fill();
   ctx.lineJoin = 'round';
   const edge = (off, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); pts.forEach((p, n) => ctx[n ? 'lineTo' : 'moveTo'](p[0], p[1] + off)); ctx.stroke(); };
-  edge(16, '#d49a46', 10); edge(0, '#c98a36', 4);
+  edge(16, lv.sand[1], 10); edge(0, lv.sand[2], 4);
 
   for (let i = Math.floor((x0 - 100) / 520); i <= Math.ceil(x1 / 520); i++) {
     const px = 250 + i * 520 + ((i * 97) % 160 + 160) % 160;
-    if (px > 150 && px < GOAL + 200) { palm(px, gy(px) + 4, .9 + (i % 3) * .1, i % 2 ? 1 : -1);
-      umbrella(px + 260, gy(px + 260) + 2, i % 2 ? '#ffc800' : '#2f9fd8'); }
+    if (px > 150 && px < GOAL + 200 && !inHole(px) && !inHole(px + 260)) decor(px, i);
   }
-  for (const sp of spikes) {                                          // duri
-    if (sp < x0 - 60 || sp > x1 + 60) continue;
-    ctx.fillStyle = '#3d6b2a'; ctx.beginPath(); ctx.ellipse(sp, gy(sp) - 4, 40, 9, 0, 0, 7); ctx.fill();
-    for (let dx = -34; dx <= 34; dx += 9) { const yy = gy(sp + dx);
-      ctx.fillStyle = '#2d4f1f'; ctx.beginPath(); ctx.moveTo(sp + dx - 5, yy); ctx.lineTo(sp + dx, yy - 24); ctx.lineTo(sp + dx + 5, yy); ctx.fill(); }
-  }
+  obs.forEach(o => { if (o.x > x0 - 80 && o.x < x1 + 80) drawObs(o); });
   ctx.fillStyle = '#2a2118'; ctx.fillRect(GOAL - 3, gy(GOAL) - 110, 6, 110); // garis finis
   for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) { ctx.fillStyle = (i + j) % 2 ? '#2a2118' : '#f4efe6'; ctx.fillRect(GOAL + 3 + j * 12, gy(GOAL) - 110 + i * 12, 12, 12); }
 
@@ -262,8 +337,8 @@ const map = { ArrowUp: 'gas', w: 'gas', ' ': 'nos', Shift: 'nos', n: 'nos', Arro
 addEventListener('keydown', e => {
   const k = map[e.key.length === 1 ? e.key.toLowerCase() : e.key];
   if (k) { K[k] = 1; e.preventDefault(); }
-  if ((e.key === 'r' || e.key === 'R') && state !== 'menu') start();
-  if ((e.key === 'Enter' || e.key === ' ') && $('overlay').classList.contains('show')) { e.preventDefault(); start(); }
+  if ((e.key === 'r' || e.key === 'R') && state !== 'menu') start(level);
+  if ((e.key === 'Enter' || e.key === ' ') && $('overlay').classList.contains('show')) { e.preventDefault(); start(nextN); }
 });
 addEventListener('keyup', e => { const k = map[e.key.length === 1 ? e.key.toLowerCase() : e.key]; if (k) K[k] = 0; });
 document.querySelectorAll('#touch button').forEach(el => {
@@ -272,7 +347,8 @@ document.querySelectorAll('#touch button').forEach(el => {
   el.addEventListener('pointercancel', on(0)); el.addEventListener('pointerleave', on(0));
   el.addEventListener('contextmenu', e => e.preventDefault());
 });
-$('play').addEventListener('click', start);
+$('play').addEventListener('click', () => start(nextN));
+renderLevels();
 $('mute').addEventListener('click', () => { $('mute').textContent = Sfx.toggleMute() ? '🔇' : '🔊'; });
 document.addEventListener('visibilitychange', () => { if (document.hidden) Sfx.stopEngine(); });
 })();
