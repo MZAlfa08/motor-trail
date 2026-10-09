@@ -148,7 +148,7 @@ function update(dt) {
   if (dead) b.a += b.av * dt;
 
   if (!dead && state === 'play') {
-    const hx = b.x + 40 * s, hy = b.y - 40 * c;          // kepala pengendara
+    const hx = b.x + 46 * s, hy = b.y - 46 * c;          // kepala pengendara
     if (hy + 8 > gy(hx)) crash();
     if (nosOn) for (let k = 0; k < 2; k++) parts.push({ x: rx - 6 * c, y: ry - 6 * s - 6, vx: -260 * c + b.vx * .3 + (Math.random() - .5) * 60,
       vy: -260 * s + (Math.random() - .5) * 60, life: .5, c: k ? '#ffd35c' : '#f0541e', f: 1 });
@@ -200,35 +200,53 @@ function umbrella(x, y, col) {
   ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y - 52, 30, Math.PI, 0); ctx.fill();
   ctx.fillStyle = '#f4efe6'; ctx.beginPath(); ctx.arc(x, y - 52, 30, Math.PI * 1.35, Math.PI * 1.65); ctx.lineTo(x, y - 52); ctx.fill();
 }
+function part(fn, fill, w) {   // bentuk bergaya kartun: garis putih tebal + garis tipis gelap
+  ctx.beginPath(); fn(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = w || 5; ctx.stroke(); ctx.fillStyle = fill; ctx.fill();
+  ctx.strokeStyle = '#3a1d10'; ctx.lineWidth = 1.2; ctx.stroke();
+}
+const poly = (pts, fill, w) => part(() => { pts.forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo'](p[0], p[1])); ctx.closePath(); }, fill, w);
+function limb(pts, col, w) {
+  ctx.beginPath(); pts.forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo'](p[0], p[1])); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = w + 5; ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke();
+}
 function wheel(x, y, rot) {
-  ctx.fillStyle = '#2a2118'; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill();
-  ctx.fillStyle = '#e8d3a0'; ctx.beginPath(); ctx.arc(x, y, R - 5, 0, 7); ctx.fill();
-  ctx.strokeStyle = '#8a8a8a'; ctx.lineWidth = 1.5;
-  for (let i = 0; i < 6; i++) { const a = rot + i * Math.PI / 3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * (R - 5), y + Math.sin(a) * (R - 5)); ctx.stroke(); }
-  ctx.fillStyle = '#555'; ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, R + 2.5, 0, 7); ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fillStyle = '#23201d'; ctx.fill();
+  ctx.setLineDash([3, 3.5]); ctx.lineDashOffset = -rot * R; ctx.strokeStyle = '#5a544e'; ctx.lineWidth = 3;      // ban bergerigi
+  ctx.beginPath(); ctx.arc(x, y, R - 1.6, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(x, y, R - 5, 0, 7); ctx.fillStyle = '#f3e7c0'; ctx.fill(); ctx.strokeStyle = '#6a5d45'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.beginPath(); for (let i = 0; i < 8; i++) { const a = rot + i * Math.PI / 4; ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * (R - 5), y + Math.sin(a) * (R - 5)); }
+  ctx.strokeStyle = '#8a7d62'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.strokeStyle = '#b9bec4'; ctx.lineWidth = 1.5; ctx.stroke();      // cakram rem
+  ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fillStyle = '#9aa0a6'; ctx.fill();
 }
 function drawBike() {
   ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a);
-  const hl = L / 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const hl = L / 2, O = '#f0541e', G = '#7ed321', D = '#2a2118';
   wheel(-hl, 0, b.wr); wheel(hl, 0, b.wr);
-  ctx.strokeStyle = '#555'; ctx.lineWidth = 4;                       // fork & swingarm
-  ctx.beginPath(); ctx.moveTo(hl, 0); ctx.lineTo(hl - 8, -22); ctx.moveTo(-hl, 0); ctx.lineTo(-6, -8); ctx.stroke();
-  ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(hl - 8, -22); ctx.lineTo(hl - 14, -28); ctx.stroke();
-  ctx.fillStyle = '#f0541e'; ctx.strokeStyle = '#2a2118'; ctx.lineWidth = 2; // badan
-  ctx.beginPath(); ctx.moveTo(-18, -6); ctx.lineTo(-10, -20); ctx.lineTo(12, -22); ctx.lineTo(20, -12); ctx.lineTo(10, -2); ctx.lineTo(-8, 2); ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#f4efe6'; ctx.beginPath(); ctx.moveTo(-32, -13); ctx.lineTo(-16, -15); ctx.lineTo(-14, -9); ctx.lineTo(-30, -6); ctx.fill();
-  ctx.fillStyle = '#2a2118'; ctx.fillRect(-20, -23, 22, 4);
-  ctx.strokeStyle = '#f0541e'; ctx.lineWidth = 9;                    // torso
-  ctx.beginPath(); ctx.moveTo(-6, -22); ctx.lineTo(-2, -36); ctx.stroke();
-  ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-2, -34); ctx.lineTo(hl - 14, -28); ctx.stroke(); // lengan
-  ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-6, -22); ctx.lineTo(6, -6); ctx.stroke();          // kaki
-  ctx.strokeStyle = '#7ed321'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(6, -6); ctx.lineTo(9, -2); ctx.stroke();
-  ctx.fillStyle = '#f0541e'; ctx.beginPath(); ctx.arc(-1, -42, 9, 0, 7); ctx.fill(); // helm
-  ctx.fillStyle = '#7ed321'; ctx.fillRect(-10, -46, 20, 3);
-  ctx.fillStyle = '#3a7bd5'; ctx.fillRect(2, -44, 8, 6);
+  ctx.beginPath(); ctx.arc(hl, 0, R + 4, -2.5, -.55); ctx.lineCap = 'round';                                   // spakbor depan
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 9; ctx.stroke(); ctx.strokeStyle = O; ctx.lineWidth = 5; ctx.stroke();
+  limb([[hl, 0], [hl - 8, -26]], '#c9ced3', 4);                       // garpu
+  limb([[-hl, 0], [-6, -8]], '#4a4540', 4);                           // swing arm
+  limb([[-14, -6], [-36, -9]], '#c9ced3', 3);                         // knalpot
+  poly([[-12, -16], [6, -16], [8, -4], [-10, -3]], '#b8bec5');         // mesin
+  poly([[-30, -15], [-14, -23], [6, -25], [17, -19], [21, -10], [8, -7], [-14, -9]], O); // badan
+  poly([[-38, -13], [-22, -18], [-17, -12], [-35, -8]], '#fff');       // spakbor belakang
+  limb([[-28, -20], [-8, -25]], D, 5);                                // jok
+  limb([[hl - 8, -26], [hl - 14, -33], [hl - 20, -34]], D, 3);        // stang
+  poly([[17, -36], [27, -34], [28, -27], [18, -28]], '#fff');          // pelat nomor
+  limb([[-8, -24], [4, -16], [6, -6]], O, 7);                         // kaki
+  poly([[2, -9], [11, -9], [12, -2], [2, -2]], G);                    // sepatu
+  limb([[-8, -24], [-1, -45]], O, 11);                                // badan pengendara
+  limb([[-2, -40], [8, -36], [hl - 14, -33]], O, 6);                  // lengan
+  part(() => ctx.arc(hl - 14, -33, 4, 0, 7), G, 3);                   // sarung tangan
+  part(() => ctx.arc(2, -52, 11, 0, 7), O, 5);                        // helm
+  ctx.beginPath(); ctx.arc(2, -52, 8.5, -2.7, -1.2); ctx.strokeStyle = G; ctx.lineWidth = 3; ctx.stroke();
+  part(() => ctx.ellipse(8, -51, 6.5, 5, 0, 0, 7), '#2f8fe0', 3);     // visor
+  ctx.beginPath(); ctx.ellipse(10, -53, 2.2, 1.3, 0, 0, 7); ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fill();
   ctx.restore();
 }
-
 function cactus(x, y, k) { ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.strokeStyle = '#3f8f45'; ctx.lineCap = 'round'; ctx.lineWidth = 16;
   ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -80); ctx.stroke(); ctx.lineWidth = 10; ctx.beginPath();
   ctx.moveTo(0, -30); ctx.lineTo(-22, -30); ctx.lineTo(-22, -55); ctx.moveTo(0, -45); ctx.lineTo(22, -45); ctx.lineTo(22, -68); ctx.stroke(); ctx.restore(); }
