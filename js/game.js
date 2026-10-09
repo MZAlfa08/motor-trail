@@ -2,7 +2,7 @@
 'use strict';
 const cv = document.getElementById('game'), ctx = cv.getContext('2d');
 const $ = id => document.getElementById(id);
-const GOAL = 9000, R = 17, L = 44, GRAV = 900, ACC = 420, MAXV = 620;
+const GOAL = 9000, R = 17, L = 44, GRAV = 900, ACC = 560, MAXV = 620, NOSACC = 900, NOSMAX = 880;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
@@ -19,41 +19,47 @@ addEventListener('orientationchange', () => setTimeout(resize, 150));
 resize();
 
 /* ---------- medan & rintangan ---------- */
-const amp = x => Math.min(1.35, Math.max(0, (x - 300) / 1500));
+const amp = x => Math.min(1.15, Math.max(0, (x - 300) / 1500));
 const spikes = [];
 for (let i = 0; 1300 + i * 700 < GOAL - 400; i++) spikes.push(1300 + i * 700 + (i * 137) % 220);
 // Rampa lompat: naik 100 unit lalu terputus, tepat sebelum tiap semak berduri
 const ramp = x => { for (const sx of spikes) { const a = sx - 370, e = sx - 50; if (x > a && x < e) { const t = (x - a) / (e - a); return 100 * t * t; } } return 0; };
 const gy = x => 420 + (55 * Math.sin(x * .004) + 28 * Math.sin(x * .011 + 1) + 40 * Math.sin(x * .0023 + 3)) * amp(x) - ramp(x);
 const slopeAt = x => Math.atan2(gy(x + 4) - gy(x - 4), 8);
+// koin berbentuk busur di atas tiap semak: jalur ideal lompatan
+const coins = spikes.flatMap(sx => [0, 1, 2, 3, 4].map(i => ({ x: sx - 30 + i * 30, y: gy(sx) - 120 - 30 * Math.sin(Math.PI * i / 4), got: 0 })));
 
 /* ---------- state ---------- */
-const K = { gas: 0, brake: 0, fwd: 0, back: 0 };
+const K = { gas: 0, brake: 0, fwd: 0, back: 0, nos: 0 };
 let b, state = 'menu', t0 = 0, time = 0, camX = 0, camY = 0, parts = [], endTimer = 0;
-let best = 0;
-try { best = +localStorage.getItem('motoBeachBest') || 0; } catch (e) {}
+let bestScore = 0, bonus = 0, nitro = 60, airRot = 0, wheelT = 0, maxX = 120, passed = [];
+try { bestScore = +localStorage.getItem('motoBeachScore') || 0; } catch (e) {}
+const total = () => Math.floor(Math.max(0, maxX - 120) / 10) + bonus;
+function saveBest() { const t = total(); if (t > bestScore) { bestScore = t; try { localStorage.setItem('motoBeachScore', t); } catch (e) {} } }
+function pop(t) { const d = document.createElement('div'); d.textContent = t; $('pop').appendChild(d); setTimeout(() => d.remove(), 1100); }
 
 function newBike() { return { x: 120, y: gy(120) - R - 2, vx: 0, vy: 0, a: 0, av: 0, g: true, wr: 0 }; }
 function start() {
   b = newBike(); parts = []; state = 'play'; t0 = performance.now(); time = 0;
+  bonus = 0; nitro = 60; airRot = 0; wheelT = 0; maxX = 120; passed = []; coins.forEach(c => c.got = 0);
   $('overlay').classList.remove('show'); Sfx.init();
 }
 b = newBike();
 
 function crash() {
   if (state !== 'play') return;
-  state = 'crash'; endTimer = .9; Sfx.crash(); Sfx.stopEngine();
+  state = 'crash'; endTimer = .9; Sfx.crash(); Sfx.stopEngine(); saveBest();
   for (let i = 0; i < 20; i++) parts.push({ x: b.x, y: b.y - 20, vx: (Math.random() - .3) * 300 + b.vx * .4,
     vy: -Math.random() * 350, life: 1, c: ['#f0541e', '#2a2118', '#7ed321', '#f4efe6'][i % 4] });
 }
 function finish() {
   state = 'done'; Sfx.stopEngine(); Sfx.win();
-  if (!best || time < best) { best = time; try { localStorage.setItem('motoBeachBest', best); } catch (e) {} }
-  showOverlay('Selesai! 🏁', 'Waktu: ' + time.toFixed(1) + ' dtk', 'Main lagi');
+  const tb = Math.max(0, Math.round((120 - time) * 10)); bonus += tb; saveBest();
+  showOverlay('Selesai! 🏁', 'Skor ' + total() + ' (bonus waktu +' + tb + ')', 'Main lagi');
 }
 function showOverlay(title, msg, btn) {
   $('msg').textContent = title + ' ' + msg;
-  $('best').textContent = best ? 'Terbaik: ' + best.toFixed(1) + ' dtk' : '';
+  $('best').textContent = bestScore ? 'Skor terbaik: ' + bestScore : '';
   $('play').textContent = btn; $('overlay').classList.add('show');
 }
 
@@ -62,19 +68,22 @@ function update(dt) {
   const dead = state === 'crash';
   const lean = dead ? 0 : (K.fwd ? 1 : 0) - (K.back ? 1 : 0);
   if (state === 'play') time = (performance.now() - t0) / 1000;
+  const nosOn = !dead && K.nos && nitro > 0;
+  if (nosOn) nitro = Math.max(0, nitro - 35 * dt); else if (!dead) nitro = Math.min(100, nitro + 4 * dt);
 
   b.vy += GRAV * dt;
   if (b.g) {
     const sl = slopeAt(b.x), tx = Math.cos(sl), ty = Math.sin(sl);
     let v = b.vx * tx + b.vy * ty;
-    if (!dead && K.gas && v < MAXV) v += ACC * dt;
+    if (!dead && v < (nosOn ? NOSMAX : MAXV)) v += ((K.gas ? ACC : 0) + (nosOn ? NOSACC : 0)) * dt;
     if (!dead && K.brake) v = v > 0 ? Math.max(0, v - 800 * dt) : Math.max(-120, v - 300 * dt);
     v *= 1 - (dead ? 3 : .25) * dt;
-    v = clamp(v, -150, 700);
+    v = clamp(v, -150, NOSMAX);
     b.vx = v * tx; b.vy = v * ty; b.wr += v / R * dt;
   } else {
+    if (nosOn) { b.vx += 400 * dt * Math.cos(b.a); b.vy += 400 * dt * Math.sin(b.a); }
     b.av = clamp((b.av + lean * 13 * dt) * (1 - .6 * dt), -7, 7);
-    b.a += b.av * dt; b.wr += b.vx / R * dt * .5;
+    b.a += b.av * dt; airRot += b.av * dt; b.wr += b.vx / R * dt * .5;
   }
   b.x += b.vx * dt; b.y += b.vy * dt;
   if (b.x < 60) { b.x = 60; b.vx = Math.max(0, b.vx); }
@@ -89,12 +98,17 @@ function update(dt) {
     if (away <= 40) {
       if (pen <= 0) b.y -= pen;
       if (!b.g && !dead) {
-        if (Math.abs(angDiff(b.a, sl)) > 1.05) crash(); else Sfx.land();
+        if (Math.abs(angDiff(b.a, sl)) > 1.05) crash();
+        else { Sfx.land(); const fl = Math.floor(Math.abs(airRot) / 5.9);
+          if (fl) { bonus += 300 * fl; nitro = Math.min(100, nitro + 20 * fl); pop('SALTO x' + fl + '  +' + 300 * fl); } }
       }
       const v = b.vx * tx + b.vy * ty;
       b.vx = v * tx; b.vy = v * ty; b.g = true;
       if (dead) { b.av = b.vx * .02; b.a += b.av * dt; }
-      else { b.a += angDiff(sl + lean * .35, b.a) * Math.min(1, 10 * dt); b.av = 0; }
+      else {
+        b.a += angDiff(sl + lean * .35, b.a) * Math.min(1, 10 * dt); b.av = 0; airRot = 0;
+        if (lean < 0 && v > 150) { wheelT += dt; if (wheelT >= 1) { wheelT = 0; bonus += 100; pop('WHEELIE  +100'); } } else wheelT = 0;
+      }
     } else b.g = false;
   } else b.g = false;
   if (dead) b.a += b.av * dt;
@@ -102,22 +116,32 @@ function update(dt) {
   if (!dead && state === 'play') {
     const hx = b.x + 40 * s, hy = b.y - 40 * c;          // kepala pengendara
     if (hy + 8 > gy(hx)) crash();
-    for (const sx of spikes) {
+    if (nosOn) for (let k = 0; k < 2; k++) parts.push({ x: rx - 6 * c, y: ry - 6 * s - 6, vx: -260 * c + b.vx * .3 + (Math.random() - .5) * 60,
+      vy: -260 * s + (Math.random() - .5) * 60, life: .5, c: k ? '#ffd35c' : '#f0541e', f: 1 });
+    maxX = Math.max(maxX, b.x);
+    for (let i = 0; i < spikes.length; i++) {
+      const sx = spikes[i];
+      if (!passed[i] && b.x > sx + 80) { passed[i] = 1; bonus += 500; nitro = Math.min(100, nitro + 25); pop('LEWAT DURI!  +500'); }
       if (Math.abs(sx - b.x) > 80) continue;
       for (const wx of [rx, fx]) {
         const wy = wx === rx ? ry : fy;
         if (Math.abs(wx - sx) < 34 && wy + R > gy(sx) - 18) crash();
       }
     }
+    for (const k of coins) {
+      if (k.got || Math.abs(k.x - b.x) > 40) continue;
+      if (Math.hypot(k.x - b.x, k.y - b.y) < 34) { k.got = 1; bonus += 100; nitro = Math.min(100, nitro + 15); Sfx.coin(); }
+    }
     if (b.x >= GOAL) finish();
-    Sfx.engine(Math.abs(b.vx) / MAXV, K.gas);
+    Sfx.engine(Math.abs(b.vx) / MAXV, K.gas, nosOn);
   }
-  if (dead) { endTimer -= dt; if (endTimer <= 0) { state = 'over'; showOverlay('Jatuh!', 'Coba lagi, jaga posisi motor saat mendarat.', 'Ulangi'); } }
+  if (dead) { endTimer -= dt; if (endTimer <= 0) { state = 'over'; showOverlay('Jatuh!', 'Skor ' + total() + '. Coba lagi, jaga posisi motor saat mendarat.', 'Ulangi'); } }
 
-  parts.forEach(p => { p.vy += GRAV * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * .8; });
+  parts.forEach(p => { if (!p.f) p.vy += GRAV * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * (p.f ? 2.2 : .8); });
   parts = parts.filter(p => p.life > 0);
 
   $('time').textContent = time.toFixed(1);
+  $('score').textContent = total(); $('nosbar').style.width = nitro + '%';
   $('prog').style.width = clamp((b.x - 120) / (GOAL - 120) * 100, 0, 100) + '%';
 }
 
@@ -189,15 +213,15 @@ function draw() {
 
   ctx.setTransform(dpr * S, 0, 0, dpr * S, -camX * dpr * S, -camY * dpr * S);
   const x0 = camX - 20, x1 = camX + vw + 20, bot = camY + vh + 20;
-  ctx.fillStyle = '#e8b866'; ctx.beginPath(); ctx.moveTo(x0, bot);
-  for (let x = x0; x <= x1; x += 8) ctx.lineTo(x, gy(x));
-  ctx.lineTo(x1, bot); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = '#d49a46'; ctx.lineWidth = 10; ctx.beginPath();
-  for (let x = x0; x <= x1; x += 8) ctx[x === x0 ? 'moveTo' : 'lineTo'](x, gy(x) + 16);
-  ctx.stroke();
-  ctx.strokeStyle = '#c98a36'; ctx.lineWidth = 4; ctx.beginPath();
-  for (let x = x0; x <= x1; x += 8) ctx[x === x0 ? 'moveTo' : 'lineTo'](x, gy(x));
-  ctx.stroke();
+  const pts = [];
+  for (let x = Math.floor(x0 / 8) * 8; x <= x1 + 8; x += 8) pts.push([x, gy(x)]);
+  for (const sx of spikes) { const e = sx - 50; if (e > x0 - 10 && e < x1 + 10) pts.push([e - .01, gy(e - .01)], [e + .01, gy(e + .01)]); }
+  pts.sort((p, q) => p[0] - q[0]);
+  ctx.fillStyle = '#e8b866'; ctx.beginPath(); ctx.moveTo(pts[0][0], bot);
+  pts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.lineTo(pts[pts.length - 1][0], bot); ctx.closePath(); ctx.fill();
+  ctx.lineJoin = 'round';
+  const edge = (off, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); pts.forEach((p, n) => ctx[n ? 'lineTo' : 'moveTo'](p[0], p[1] + off)); ctx.stroke(); };
+  edge(16, '#d49a46', 10); edge(0, '#c98a36', 4);
 
   for (let i = Math.floor((x0 - 100) / 520); i <= Math.ceil(x1 / 520); i++) {
     const px = 250 + i * 520 + ((i * 97) % 160 + 160) % 160;
@@ -213,6 +237,12 @@ function draw() {
   ctx.fillStyle = '#2a2118'; ctx.fillRect(GOAL - 3, gy(GOAL) - 110, 6, 110); // garis finis
   for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) { ctx.fillStyle = (i + j) % 2 ? '#2a2118' : '#f4efe6'; ctx.fillRect(GOAL + 3 + j * 12, gy(GOAL) - 110 + i * 12, 12, 12); }
 
+  for (const k of coins) {
+    if (k.got || k.x < x0 - 20 || k.x > x1 + 20) continue;
+    ctx.fillStyle = '#ffc800'; ctx.strokeStyle = '#2a2118'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(k.x, k.y, 9, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff3b0'; ctx.fillRect(k.x - 1.5, k.y - 5, 3, 10);
+  }
   drawBike();
   parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, 7, 7); });
   ctx.globalAlpha = 1;
@@ -228,7 +258,7 @@ function frame(ts) {
 requestAnimationFrame(frame);
 
 /* ---------- input ---------- */
-const map = { ArrowUp: 'gas', w: 'gas', ArrowDown: 'brake', s: 'brake', ArrowLeft: 'back', a: 'back', ArrowRight: 'fwd', d: 'fwd' };
+const map = { ArrowUp: 'gas', w: 'gas', ' ': 'nos', Shift: 'nos', n: 'nos', ArrowDown: 'brake', s: 'brake', ArrowLeft: 'back', a: 'back', ArrowRight: 'fwd', d: 'fwd' };
 addEventListener('keydown', e => {
   const k = map[e.key.length === 1 ? e.key.toLowerCase() : e.key];
   if (k) { K[k] = 1; e.preventDefault(); }
