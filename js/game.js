@@ -284,14 +284,19 @@ function backdrop() {
       ctx.fillRect(x, y, 2 + i % 3, 2 + i % 3); }
   }
 }
+let zoom = 1;
 function draw() {
-  const vw = W / S, vh = H / S;
+  // Kamera pintar: zoom-out saat motor tinggi, dan fokus ke tanah di depan agar area pendaratan selalu terlihat
+  const air = Math.max(0, g0(b.x) - b.y);
+  zoom += (clamp(1 - Math.max(0, air - 60) / 450, .6, 1) - zoom) * .08;
+  const SS = S * zoom, vw = W / SS, vh = H / SS;
   camX = b.x - vw * .3;
-  camY += (b.y - vh * .62 - camY) * .12;
+  const f = (g0(b.x) + g0(b.x + 160) + g0(b.x + 320)) / 3 * .6 + b.y * .4;
+  camY += (f - vh * .58 - camY) * .12;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   backdrop();
 
-  ctx.setTransform(dpr * S, 0, 0, dpr * S, -camX * dpr * S, -camY * dpr * S);
+  ctx.setTransform(dpr * SS, 0, 0, dpr * SS, -camX * dpr * SS, -camY * dpr * SS);
   const x0 = camX - 20, x1 = camX + vw + 20, bot = camY + vh + 20;
   const pts = [], xs = [];
   for (let x = Math.floor(x0 / 8) * 8; x <= x1 + 8; x += 8) pts.push([x, gy(x)]);
@@ -317,6 +322,10 @@ function draw() {
     ctx.fillStyle = '#ffc800'; ctx.strokeStyle = '#2a2118'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(k.x, k.y, 9, 0, 7); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#fff3b0'; ctx.fillRect(k.x - 1.5, k.y - 5, 3, 10);
+  }
+  if (!b.g && state !== 'menu') {   // bayangan di tanah: penanda titik pendaratan
+    const gg = gy(b.x), hg = gg - b.y;
+    ctx.fillStyle = 'rgba(0,0,0,' + clamp(.35 - hg / 900, .1, .35) + ')'; ctx.beginPath(); ctx.ellipse(b.x, gg + 1, 30, 5, 0, 0, 7); ctx.fill();
   }
   drawBike();
   parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, 7, 7); });
