@@ -11,16 +11,20 @@
 
 <div id="hud">
   <div class="stat"><span id="time">0.0</span> dtk</div>
+  <div class="stat sc"><span id="score">0</span> poin</div>
   <div class="bar"><i id="prog"></i></div>
   <button id="mute" aria-label="Suara">🔊</button>
 </div>
 
+<div id="nos"><i id="nosbar"></i><span>NOS</span></div>
+<div id="pop"></div>
+
 <div id="overlay" class="show">
   <h1><span>MOTO</span> <b>BEACH</b> <em>X</em></h1>
-  <p id="msg">Capai garis finis tanpa jatuh. Gas penuh di rampa untuk melompati semak berduri, lalu mendaratlah dengan roda!</p>
+  <p id="msg">Gas penuh di rampa untuk melompati semak berduri, ambil koin, salto dan wheelie untuk bonus. Tahan NOS di tanjakan curam!</p>
   <p id="best"></p>
   <button id="play">Main</button>
-  <small class="keys">Panah / WASD: gas, rem, miring &nbsp;|&nbsp; R: ulangi</small>
+  <small class="keys">Panah / WASD: gas, rem, miring &nbsp;|&nbsp; Spasi / Shift: NOS &nbsp;|&nbsp; R: ulangi</small>
 </div>
 
 <div id="touch">
@@ -30,6 +34,7 @@
   </div>
   <div class="grp">
     <button data-k="brake" aria-label="Rem">REM</button>
+    <button data-k="nos" class="nosbtn" aria-label="NOS">NOS</button>
     <button data-k="gas" class="gas" aria-label="Gas">GAS</button>
   </div>
 </div>
