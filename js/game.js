@@ -66,7 +66,7 @@ function pop(t) { const d = document.createElement('div'); d.textContent = t; $(
 function newBike() { return { x: 120, y: gy(120) - R - 2, vx: 0, vy: 0, a: 0, av: 0, g: true, wr: 0 }; }
 function start(n) {
   loadLevel(n); b = newBike(); parts = []; state = 'play'; t0 = performance.now(); time = 0;
-  bonus = 0; nitro = 60; airRot = 0; wheelT = 0; maxX = 120; passed = []; coins.forEach(c => c.got = 0);
+  rag = null; susp = 0; suspV = 0; trick = 0; trickT = 0; airT = 0; prevSl = null; bonus = 0; nitro = 60; airRot = 0; wheelT = 0; maxX = 120; passed = []; coins.forEach(c => c.got = 0);
   $('overlay').classList.remove('show'); Sfx.init();
   $('lvname').textContent = 'Level ' + (n + 1) + ' · ' + lv.name; pop('LEVEL ' + (n + 1) + ' · ' + lv.name.toUpperCase());
 }
@@ -74,7 +74,12 @@ b = newBike();
 
 function crash() {
   if (state !== 'play') return;
-  state = 'crash'; endTimer = .9; Sfx.crash(); Sfx.stopEngine(); saveBest();
+  state = 'crash'; endTimer = style === '3d' ? 1.6 : .9;
+  if (style === '3d') {
+    const k = R / 172, v0 = [868 - MX, 436 - MY], cs = Math.cos(-TH), sn = Math.sin(-TH), c = Math.cos(b.a), s = Math.sin(b.a);
+    const lx = (v0[0] * cs - v0[1] * sn) * k, ly = (v0[0] * sn + v0[1] * cs) * k;
+    rag = { x: b.x + lx * c - ly * s, y: b.y + lx * s + ly * c, vx: b.vx * 1.05 + 90, vy: Math.min(b.vy, 0) - 260, a: b.a * .3, av: (Math.random() < .5 ? -1 : 1) * (4 + Math.random() * 4), rest: false };
+  } Sfx.crash(); Sfx.stopEngine(); saveBest();
   for (let i = 0; i < 20; i++) parts.push({ x: b.x, y: b.y - 20, vx: (Math.random() - .3) * 300 + b.vx * .4,
     vy: -Math.random() * 350, life: 1, c: ['#f0541e', '#2a2118', '#7ed321', '#f4efe6'][i % 4] });
 }
@@ -104,6 +109,7 @@ function showOverlay(title, msg, btn) {
   $('play').textContent = btn; nextBtn = btn; renderLevels(); $('overlay').classList.add('show');
 }
 
+let susp = 0, suspV = 0, crouch = .12, trick = 0, trickT = 0, airT = 0, rLean = 0, prevSl = null, rag = null;
 let style = '3d';
 try { style = localStorage.getItem('motoStyle') || '3d'; } catch (e) {}
 
@@ -143,7 +149,9 @@ function update(dt) {
       if (pen <= 0) b.y -= pen;
       if (!b.g && !dead) {
         if (Math.abs(angDiff(b.a, sl)) > 1.05) crash();
-        else { Sfx.land(); const fl = Math.floor(Math.abs(airRot) / 5.9);
+        else { Sfx.land(); suspV += clamp(-away / 55, 0, 16);
+          if (trickT > .3 && style === '3d') { bonus += 150; nitro = Math.min(100, nitro + 10); pop('FREESTYLE  +150'); }
+          const fl = Math.floor(Math.abs(airRot) / 5.9);
           if (fl) { bonus += 300 * fl; nitro = Math.min(100, nitro + 20 * fl); pop('SALTO x' + fl + '  +' + 300 * fl); } }
       }
       const v = b.vx * tx + b.vy * ty;
@@ -156,6 +164,23 @@ function update(dt) {
     } else b.g = false;
   } else b.g = false;
   if (dead) b.a += b.av * dt;
+
+  // --- animasi hidup: suspensi elastis, kuda-kuda pengendara, freestyle di udara ---
+  const air = Math.max(0, g0(b.x) - b.y); let F = 0;
+  if (b.g && !dead) { const s2 = slopeAt(b.x); if (prevSl !== null) F = clamp(-(s2 - prevSl) / Math.max(dt, .001) * Math.hypot(b.vx, b.vy) * .09, -60, 90); prevSl = s2; } else prevSl = null;
+  suspV += (-180 * susp - 11 * suspV + F) * dt; susp = clamp(susp + suspV * dt, -.5, 1.3);
+  airT = b.g ? 0 : airT + dt;
+  trick += ((!dead && !b.g && airT > .3 && air > 85 ? 1 : 0) - trick) * Math.min(1, 8 * dt);
+  if (trick > .7) trickT += dt; else if (b.g) trickT = 0;
+  crouch += ((b.g ? .12 + Math.max(0, susp) * .8 : .25) - crouch) * Math.min(1, 12 * dt);
+  rLean += (lean - rLean) * Math.min(1, 10 * dt);
+  if (rag && !rag.rest) {
+    rag.vy += GRAV * dt; rag.x += rag.vx * dt; rag.y += rag.vy * dt; rag.a += rag.av * dt; let hit = false;
+    for (const ly of [0, -40, -64]) { const wx = rag.x - ly * Math.sin(rag.a), wy = rag.y + ly * Math.cos(rag.a), pen = wy + 4 - gy(wx);
+      if (pen > 0) { rag.y -= pen; hit = true; if (rag.vy > 0) rag.vy *= -.3; } }
+    if (hit) { rag.vx *= 1 - 1.5 * dt; rag.av *= 1 - 3 * dt; rag.a += ((rag.vx >= 0 ? 1 : -1) * 1.5 - rag.a) * Math.min(1, 5 * dt);
+      if (Math.abs(rag.vx) < 25 && Math.abs(rag.vy) < 40) { rag.rest = true; rag.vx = rag.vy = rag.av = 0; } }
+  }
 
   if (!dead && state === 'play') {
     const hxL = style === '3d' ? -4 : 8, hyL = style === '3d' ? -66 : -58;   // posisi helm di bingkai motor
@@ -289,48 +314,88 @@ function wheelRef(c, rot) {
   const h = ctx.createRadialGradient(x - 12, y - 12, 4, x, y, 50); h.addColorStop(0, '#cf94ee'); h.addColorStop(1, '#8a45b8');
   ctx.beginPath(); ctx.arc(x, y, 48, 0, 7); ctx.fillStyle = h; ctx.fill();
 }
-function bikeArt() {
-  const O = '#ff7a14', P = '#b76fd1', B = '#2f4fbf', W = '#eaf1ff', N = 'rgba(0,0,0,0)';
-  wheelRef(RW, b.wr); wheelRef(FW, b.wr);
-  tube([[660, 655], [920, 582]], '#15151c', 5, N);                                                        // ekor tipis
-  tube([[1135, 668], [995, 800]], P, 46);                                                                 // swing arm ungu
-  tube([[885, 624], [1125, 652]], P, 54);                                                                 // dudukan ungu
-  shade([[1195, 400], [1245, 382], [1262, 420], [1292, 560], [1268, 622], [1210, 640], [1150, 610], [1170, 520]], '#5a5e6c', '#3a3d49'); // panel gelap
-  tube([[1262, 480], [1188, 598]], P, 14, N);
-  shade([[915, 580], [1072, 548], [1150, 665], [990, 640]], '#ff8f2c', '#f2640c');                         // baji oranye
-  tube([[1215, 312], [1124, 540]], O, 48);                                                                // tabung rangka
-  tube([[1255, 312], [1350, 360]], '#4a4d59', 10, N);                                                     // batang garpu
-  tube([[1350, 368], [1500, 448]], O, 54);                                                                // garpu oranye
-  shade([[1180, 288], [1236, 268], [1258, 306], [1206, 328]], '#ff9a2a', '#f0600a');                      // klem
-  tube([[1160, 264], [1200, 252]], '#8d93a3', 14);                                                        // stang
-  tube([[868, 432], [990, 488]], B, 92, 'rgba(255,255,255,.16)'); tube([[990, 488], [1105, 578]], B, 62, 'rgba(255,255,255,.16)');                         // kaki biru
-  tube([[872, 428], [1040, 497]], W, 22, N);                                                              // garis putih paha
-  shade([[1085, 592], [1135, 562], [1190, 610], [1256, 616], [1250, 652], [1196, 692], [1150, 690], [1100, 652]], '#ffffff', '#cfd5e2'); // sepatu
-  shade([[1085, 586], [1138, 560], [1162, 598], [1108, 626]], '#2a2a36', '#14141c');
-  tube([[1160, 640], [1235, 640]], '#14141c', 10, N);
+const U = [.805, -.593], NN = [.593, .805];            // arah depan & bawah bingkai motor (koordinat gambar)
+const H0 = [868, 436], S0 = [835, 214], C0 = [808, 102], A0 = [1105, 578], G0 = [1118, 247];
+const BOOT = [[1085, 592], [1135, 562], [1190, 610], [1256, 616], [1250, 652], [1196, 692], [1150, 690], [1100, 652]].map(p => [p[0] - A0[0], p[1] - A0[1]]);
+const CUFF = [[1085, 586], [1138, 560], [1162, 598], [1108, 626]].map(p => [p[0] - A0[0], p[1] - A0[1]]);
+function ik(p0, p1, l1, l2, flip) {                      // sendi 2 ruas (lutut / siku)
+  let dx = p1[0] - p0[0], dy = p1[1] - p0[1], d = Math.hypot(dx, dy) || 1; const m = l1 + l2 - .5;
+  const e = d > m ? [p0[0] + dx / d * m, p0[1] + dy / d * m] : p1; d = Math.min(d, m); dx = e[0] - p0[0]; dy = e[1] - p0[1];
+  const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a)), ux = dx / d, uy = dy / d;
+  return [[p0[0] + ux * a - uy * h * flip, p0[1] + uy * a + ux * h * flip], e];
+}
+function riderArt(H, A, G, phi, fa) {
+  const B = '#2f4fbf', W = '#eaf1ff', N = 'rgba(0,0,0,0)', hl = 'rgba(255,255,255,.16)';
+  const rot = (v, a) => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a)];
+  const sv = rot([S0[0] - H0[0], S0[1] - H0[1]], phi), S = [H[0] + sv[0], H[1] + sv[1]];
+  const hv = rot([C0[0] - S0[0], C0[1] - S0[1]], phi * 1.3), C = [S[0] + hv[0], S[1] + hv[1]];
+  const kk = ik(H, A, 134, 146, -1), kn = kk[0], an = kk[1];
+  tube([H, kn], B, 92, hl); tube([kn, an], B, 62, hl);                                  // kaki elastis
+  tube([[H[0] + 4, H[1] - 2], [kn[0] - 6, kn[1] - 4]], W, 20, N);
+  ctx.save(); ctx.translate(an[0], an[1]); ctx.rotate(fa);                              // sepatu
+  shade(BOOT, '#ffffff', '#cfd5e2'); shade(CUFF, '#2a2a36', '#14141c'); tube([[55, 62], [130, 62]], '#14141c', 10, N); ctx.restore();
+  ctx.save(); ctx.translate(H[0], H[1]); ctx.rotate(phi); ctx.translate(-H0[0], -H0[1]);   // badan
   const tg = ctx.createLinearGradient(770, 0, 930, 0); tg.addColorStop(0, '#2a46b8'); tg.addColorStop(1, '#3d62d4');
   ctx.beginPath(); ctx.moveTo(772, 235); ctx.bezierCurveTo(768, 320, 790, 400, 850, 452); ctx.lineTo(910, 432);
   ctx.bezierCurveTo(928, 360, 892, 300, 926, 228); ctx.bezierCurveTo(905, 188, 840, 172, 790, 196); ctx.closePath();
-  ctx.fillStyle = tg; ctx.fill();                                                                                  // badan
-  tube([[798, 228], [832, 322], [884, 392]], W, 44, N);                                                   // garis putih badan
-  tube([[838, 214], [1118, 247]], B, 42, 'rgba(255,255,255,.16)');                                                                 // lengan
-  tube([[945, 222], [956, 264]], W, 20, N);                                                               // manset
-  ctx.beginPath(); ctx.arc(1132, 246, 26, 0, 7); ctx.fillStyle = '#14141c'; ctx.fill();                   // sarung tangan
-  tube([[1160, 262], [1188, 254]], '#8d93a3', 12, N);
-  shade([[782, 160], [828, 160], [830, 190], [784, 188]], '#2a2a36', '#14141c');                          // leher
+  ctx.fillStyle = tg; ctx.fill(); tube([[798, 228], [832, 322], [884, 392]], W, 44, N); ctx.restore();
+  const aa = ik(S, G, 150, 140, 1), el = aa[0], ge = aa[1];                              // lengan elastis
+  tube([S, el], B, 44, hl); tube([el, ge], B, 40, hl);
+  const dx = ge[0] - el[0], dy = ge[1] - el[1], dl = Math.hypot(dx, dy) || 1, cm = [el[0] + dx * .35, el[1] + dy * .35];
+  tube([[cm[0] + dy / dl * 10, cm[1] - dx / dl * 10], [cm[0] - dy / dl * 10, cm[1] + dx / dl * 10]], W, 18, N);
+  ctx.beginPath(); ctx.arc(ge[0], ge[1], 26, 0, 7); ctx.fillStyle = '#14141c'; ctx.fill();   // sarung tangan
+  ctx.save(); ctx.translate(C[0], C[1]); ctx.rotate(phi * 1.3); ctx.translate(-C0[0], -C0[1]);   // kepala
+  shade([[782, 160], [828, 160], [830, 190], [784, 188]], '#2a2a36', '#14141c');
   const g = ctx.createLinearGradient(0, 30, 0, 180); g.addColorStop(0, '#46c8f8'); g.addColorStop(1, '#3a62d0');
-  ctx.beginPath(); ctx.ellipse(808, 102, 88, 76, -.15, 0, 7); ctx.fillStyle = g; ctx.fill();                      // helm
+  ctx.beginPath(); ctx.ellipse(808, 102, 88, 76, -.15, 0, 7); ctx.fillStyle = g; ctx.fill();
   ctx.save(); ctx.clip();
-  tube([[700, 140], [900, 112]], '#14182e', 22, N);                                                               // pita visor
-  ctx.beginPath(); ctx.ellipse(872, 98, 27, 27, -.3, 0, 7); ctx.fillStyle = '#1a1f3a'; ctx.fill();                  // kaca wajah
+  tube([[700, 140], [900, 112]], '#14182e', 22, N);
+  ctx.beginPath(); ctx.ellipse(872, 98, 27, 27, -.3, 0, 7); ctx.fillStyle = '#1a1f3a'; ctx.fill(); ctx.restore();
+  ctx.beginPath(); ctx.ellipse(856, 86, 14, 9, -.5, 0, 7); ctx.fillStyle = '#ffb13a'; ctx.fill();
+  shade([[868, 122], [898, 118], [902, 152], [872, 162]], '#4a6fd0', '#2a3a78');
+  const pg = ctx.createLinearGradient(0, 20, 0, 100); pg.addColorStop(0, '#2f3042'); pg.addColorStop(1, '#0f0f16');   // lidah helm trail (peak)
+  ctx.beginPath(); ctx.moveTo(768, 88); ctx.quadraticCurveTo(830, 40, 990, 30); ctx.lineTo(1000, 50); ctx.quadraticCurveTo(900, 74, 846, 104); ctx.closePath();
+  ctx.fillStyle = pg; ctx.fill(); tube([[800, 66], [950, 38]], '#5b8cf0', 5, N);
   ctx.restore();
-  ctx.beginPath(); ctx.ellipse(856, 86, 14, 9, -.5, 0, 7); ctx.fillStyle = '#ffb13a'; ctx.fill();                  // kilau goggle
-  shade([[868, 122], [898, 118], [902, 152], [872, 162]], '#4a6fd0', '#2a3a78');                                   // dagu helm
-  shade([[786, 82], [842, 10], [834, 98]], '#2a2a36', '#0f0f16');                                                  // sirip helm
+}
+function bikeArt(noRider) {
+  const O = '#ff7a14', P = '#b76fd1', N = 'rgba(0,0,0,0)';
+  const c = clamp(susp, -.4, 1.2) * 70, ox = c * NN[0], oy = c * NN[1], o = (x, y) => [x + ox, y + oy];
+  wheelRef(RW, b.wr); wheelRef(FW, b.wr);
+  tube([[1350, 368], [1500, 448]], O, 54);                                              // garpu bawah (ikut roda)
+  const sw = o(1135, 668), hub = [995, 800];
+  tube([sw, hub], P, 46);                                                               // swing arm berayun
+  const pa = [hub[0] + (sw[0] - hub[0]) * .55, hub[1] + (sw[1] - hub[1]) * .55], pb = o(1018, 626);   // pegas peredam belakang
+  const len = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) || 1, dx = (pb[0] - pa[0]) / len, dy = (pb[1] - pa[1]) / len, pts = [pa];
+  for (let i = 1; i < 14; i++) { const t = i / 14, sd = (i % 2 ? 1 : -1) * 24; pts.push([pa[0] + dx * len * t - dy * sd, pa[1] + dy * len * t + dx * sd]); }
+  pts.push(pb); tube(pts, '#ffb21e', 9, 'rgba(255,255,255,.3)');
+  tube([o(1255, 312), [1350, 362]], '#4a4d59', 10, N);                                  // batang garpu (teleskop)
+  ctx.save(); ctx.translate(ox, oy);
+  tube([[660, 655], [920, 582]], '#15151c', 5, N);
+  tube([[885, 624], [1125, 652]], P, 54);
+  shade([[1195, 400], [1245, 382], [1262, 420], [1292, 560], [1268, 622], [1210, 640], [1150, 610], [1170, 520]], '#5a5e6c', '#3a3d49');
+  tube([[1262, 480], [1188, 598]], P, 14, N);
+  shade([[915, 580], [1072, 548], [1150, 665], [990, 640]], '#ff8f2c', '#f2640c');
+  tube([[1215, 312], [1124, 540]], O, 48);
+  shade([[1180, 288], [1236, 268], [1258, 306], [1206, 328]], '#ff9a2a', '#f0600a');
+  tube([[1160, 264], [1200, 252]], '#8d93a3', 14); tube([[1160, 262], [1188, 254]], '#8d93a3', 12, N);
+  ctx.restore();
+  if (noRider) return;
+  const tr = trick, cr = crouch, bob = Math.sin(performance.now() / 1000 * 11) * Math.min(1, Math.abs(b.vx) / 500) * (b.g ? 1 : 0);
+  const H = [H0[0] + ox + cr * (NN[0] * 55 - U[0] * 14) + tr * (U[0] * 35 - NN[0] * 25), H0[1] + oy + cr * (NN[1] * 55 - U[1] * 14) + tr * (U[1] * 35 - NN[1] * 25) + bob * 6];
+  const A = [A0[0] + ox + tr * (-U[0] * 220 - NN[0] * 110), A0[1] + oy + tr * (-U[1] * 220 - NN[1] * 110)];   // freestyle: kaki terjulur ke belakang
+  riderArt(H, A, [G0[0] + ox, G0[1] + oy], rLean * .18 + cr * .3 + tr * .35 + bob * .02, -tr * .9);
+}
+function drawRag() {                                     // pengendara terlempar (ragdoll sederhana)
+  const r = rag, k = R / 172, t = performance.now() / 1000, f = r.rest ? 0 : 1;
+  ctx.save(); ctx.translate(r.x, r.y); ctx.rotate(r.a); ctx.scale(k, k); ctx.translate(-H0[0], -H0[1]);
+  riderArt(H0, [H0[0] + 90 + 120 * f * Math.sin(t * 8), H0[1] + 230 - 40 * f * Math.abs(Math.sin(t * 9))],
+    [S0[0] + 60 + 130 * f * Math.sin(t * 7), S0[1] + 170 - 90 * f * Math.abs(Math.cos(t * 6))], .3 * f * Math.sin(t * 5), f * Math.sin(t * 6));
+  ctx.restore();
 }
 function drawBike3D() {
   ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); const k = R / 172; ctx.scale(k, k); ctx.rotate(-TH); ctx.translate(-MX, -MY);
-  bikeArt(); ctx.restore();
+  bikeArt(!!rag); ctx.restore();
 }
 function drawBike() { if (style === '3d') drawBike3D(); else drawBikeCartoon(); }
 function cactus(x, y, k) { ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.strokeStyle = '#3f8f45'; ctx.lineCap = 'round'; ctx.lineWidth = 16;
@@ -446,6 +511,7 @@ function draw() {
     ctx.fillStyle = 'rgba(0,0,0,' + clamp(.35 - hg / 900, .1, .35) + ')'; ctx.beginPath(); ctx.ellipse(b.x, gg + 1, 42, 7, 0, 0, 7); ctx.fill();
   }
   drawBike();
+  if (rag && style === '3d') drawRag();
   parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, 7, 7); });
   ctx.globalAlpha = 1;
 }
