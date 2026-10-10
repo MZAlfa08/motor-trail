@@ -53,3 +53,5 @@ h1 b{color:var(--sand)}h1 em{color:var(--orange);font-style:normal;font-size:1.2
 #levels button:disabled{opacity:.45;cursor:not-allowed}
 #lvname{position:fixed;left:max(12px,env(safe-area-inset-left));top:calc(max(10px,env(safe-area-inset-top)) + 74px);
   font-size:clamp(13px,3vw,16px);color:var(--bone);text-shadow:1px 1px 0 var(--ink);pointer-events:none}
+
+.ghost{padding:6px 14px;font-size:clamp(12px,3vw,15px);background:rgba(244,239,230,.15);color:var(--bone);border:2px solid var(--bone);border-radius:10px}
