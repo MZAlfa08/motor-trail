@@ -82,3 +82,5 @@ h1 b{color:var(--sand)}h1 em{color:var(--orange);font-style:normal;font-size:1.2
   #play{padding:7px 30px;font-size:18px;margin-top:2px}
   .keys{display:none!important}
 }
+
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
