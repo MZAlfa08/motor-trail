@@ -46,6 +46,7 @@ const Sfx = (() => {
     tone(90, .4, 'sawtooth', .2);
   }
   function coin() { tone(880, .08, 'square', .06); tone(1320, .12, 'square', .06, .06); }
+  function pick() { tone(660, .1, 'triangle', .08); tone(990, .16, 'triangle', .08, .08); }
   function land() { tone(120, .12, 'sine', .25); }
   function win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, .3, 'square', .08, i * .13)); }
   function toggleMute() {
@@ -53,5 +54,5 @@ const Sfx = (() => {
     if (master) master.gain.value = muted ? 0 : .6;
     return muted;
   }
-  return { init, coin, engine, stopEngine, crash, land, win, toggleMute };
+  return { init, pick, coin, engine, stopEngine, crash, land, win, toggleMute };
 })();
