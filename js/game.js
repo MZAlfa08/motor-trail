@@ -22,13 +22,20 @@ resize();
 /* ---------- level & medan ---------- */
 const LEVELS = [
   { name: 'Pantai', goal: 7000, amp: 1.0, ph: 0, gap: 700, obs: ['bush'], drag: .25, deco: 'palm', far: 'sea',
-    sky: ['#6fbdee', '#cfe9f5'], sun: '#ffd35c', farC: ['#2f9fd8', '#5fc4e8'], sand: ['#e8b866', '#d49a46', '#c98a36'], pit: '#2f9fd8' },
+    sky: ['#6fbdee', '#cfe9f5'], sun: '#ffd35c', farC: ['#2f9fd8', '#5fc4e8'], sand: ['#e8b866', '#d49a46', '#c98a36'], pit: '#2f9fd8',
+    g3d: { rim: '#fff3c4', top: '#f4cf85', mid: '#e2a955', soil: ['#d99a4a', '#a8692a'] } },
   { name: 'Gurun', goal: 8000, amp: 1.1, ph: 2, gap: 650, obs: ['cactus', 'rock', 'cactus', 'cactus', 'rock'], drag: .25, deco: 'cactus', far: 'dune',
-    sky: ['#f6a95c', '#fde3b0'], sun: '#fff1c2', farC: ['#e6a766', '#d98f4e'], sand: ['#e9a24e', '#cf8638', '#b86f2c'], pit: '#8a4b1f' },
+    sky: ['#f6a95c', '#fde3b0'], sun: '#fff1c2', farC: ['#e6a766', '#d98f4e'], sand: ['#e9a24e', '#cf8638', '#b86f2c'], pit: '#8a4b1f',
+    g3d: { rim: '#ffe0a0', top: '#f0b45c', mid: '#d98a3a', soil: ['#c97a32', '#8a4b1f'] } },
   { name: 'Salju', goal: 8500, amp: 1.15, ph: 4, gap: 650, obs: ['ice', 'hole', 'ice', 'hole'], drag: .06, brake: 450, deco: 'pine', far: 'peak', snow: 1,
-    sky: ['#9db7d6', '#e8f1fa'], sun: '#ffffff', farC: ['#cfe0f0', '#8fa6c4'], sand: ['#f2f7fb', '#c7dcee', '#a9c6e0'], pit: '#2b4a73' },
+    sky: ['#9db7d6', '#e8f1fa'], sun: '#ffffff', farC: ['#cfe0f0', '#8fa6c4'], sand: ['#f2f7fb', '#c7dcee', '#a9c6e0'], pit: '#2b4a73',
+    g3d: { rim: '#ffffff', top: '#eaf4fb', mid: '#c4dcee', soil: ['#8fb0cf', '#5f7fa6'] } },
   { name: 'Gunung Api', goal: 9500, amp: 1.3, ph: 1, gap: 600, obs: ['ember', 'hole', 'rock', 'hole', 'ember'], drag: .25, deco: 'dead', far: 'peak', ash: 1,
-    sky: ['#3a1c1c', '#d0552b'], sun: '#ffb347', farC: ['#c2411c', '#2a1414'], sand: ['#5a3a32', '#3e2622', '#2a1816'], pit: '#ff5a1f' }
+    sky: ['#3a1c1c', '#d0552b'], sun: '#ffb347', farC: ['#c2411c', '#2a1414'], sand: ['#5a3a32', '#3e2622', '#2a1816'], pit: '#ff5a1f',
+    g3d: { rim: '#ff9a4a', top: '#7a4b3c', mid: '#4a2e28', soil: ['#3a2220', '#1d0f0e'] } },
+  { name: 'Bukit Hijau', goal: 9000, amp: 1.2, ph: 3, gap: 620, obs: ['bush', 'rock', 'hole', 'bush'], drag: .25, deco: 'none', far: 'peak',
+    sky: ['#4fd3f7', '#c8f7ff'], sun: '#fffbd0', farC: ['#aeeaf7', '#c9f4fb'], sand: ['#6fd62a', '#3fb30e', '#2a8a08'], pit: '#3a2a1a',
+    g3d: { rim: '#d9ff4a', top: '#7be31b', mid: '#46b80f', soil: ['#7a4a2a', '#4a2a14'] } }
 ];
 const OB = { bush: { hw: 34, ch: 18 }, cactus: { hw: 24, ch: 26 }, rock: { hw: 30, ch: 30 }, ice: { hw: 34, ch: 22 }, ember: { hw: 34, ch: 20 }, hole: { hw: 55, ch: 0 } };
 let lv, level = 0, obs = [], holes = [], coins = [];
@@ -96,6 +103,9 @@ function showOverlay(title, msg, btn) {
   $('best').textContent = bestScore ? 'Skor terbaik: ' + bestScore : '';
   $('play').textContent = btn; nextBtn = btn; renderLevels(); $('overlay').classList.add('show');
 }
+
+let style = '3d';
+try { style = localStorage.getItem('motoStyle') || '3d'; } catch (e) {}
 
 /* ---------- update ---------- */
 function update(dt) {
@@ -222,7 +232,7 @@ function wheel(x, y, rot) {
   ctx.beginPath(); ctx.arc(x, y, 7.5, 0, 7); ctx.strokeStyle = '#b9bec4'; ctx.lineWidth = 1.6; ctx.stroke();    // cakram rem
   ctx.beginPath(); ctx.arc(x, y, 3.5, 0, 7); ctx.fillStyle = '#8f959b'; ctx.fill();
 }
-function drawBike() {
+function drawBikeCartoon() {
   const K = R / 17, hl = 22, O = '#f0541e', O2 = '#c93a10', G = '#7ed321', D = '#2a2118', S1 = '#c9ced3';
   ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); ctx.scale(K, K);
   wheel(-hl, 0, b.wr); wheel(hl, 0, b.wr);
@@ -251,6 +261,54 @@ function drawBike() {
   ctx.beginPath(); ctx.ellipse(19, -58, 3, 1.8, 0, 0, 7); ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fill();
   ctx.restore();
 }
+function tube(pts, col, w, hi) {
+  const path = () => { ctx.beginPath(); pts.forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo'](p[0], p[1])); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; };
+  path(); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke();
+  ctx.save(); ctx.translate(-w * .14, -w * .14); path(); ctx.strokeStyle = hi || 'rgba(255,255,255,.35)'; ctx.lineWidth = w * .4; ctx.stroke(); ctx.restore();
+}
+function shade(pts, c0, c1) {
+  const ys = pts.map(p => p[1]), g = ctx.createLinearGradient(0, Math.min(...ys), 0, Math.max(...ys)); g.addColorStop(0, c0); g.addColorStop(1, c1);
+  ctx.beginPath(); pts.forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo'](p[0], p[1])); ctx.closePath(); ctx.lineJoin = 'round'; ctx.fillStyle = g; ctx.fill();
+}
+function wheel3(x, y, rot) {
+  ctx.beginPath(); ctx.arc(x, y, 14, 0, 7); ctx.strokeStyle = '#34363f'; ctx.lineWidth = 7; ctx.stroke();                       // ban
+  ctx.beginPath(); ctx.arc(x - .8, y - .8, 14, 3.4, 5.2); ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 3; ctx.stroke(); // kilau
+  ctx.setLineDash([3, 4]); ctx.lineDashOffset = -rot * 17; ctx.beginPath(); ctx.arc(x, y, 17, 0, 7);
+  ctx.strokeStyle = '#23252c'; ctx.lineWidth = 2.2; ctx.stroke(); ctx.setLineDash([]);                                         // gerigi
+  ctx.beginPath(); ctx.arc(x, y, 10.2, 0, 7); ctx.strokeStyle = '#ff6a1a'; ctx.lineWidth = 1.6; ctx.stroke();                  // pelek oranye
+  ctx.beginPath(); for (let i = 0; i < 18; i++) { const a = rot + i * Math.PI / 9;
+    ctx.moveTo(x + Math.cos(a) * 4.5, y + Math.sin(a) * 4.5); ctx.lineTo(x + Math.cos(a + .25) * 10, y + Math.sin(a + .25) * 10); }
+  ctx.strokeStyle = '#1b1b26'; ctx.lineWidth = .8; ctx.stroke();
+  const g = ctx.createRadialGradient(x - 1, y - 1, 1, x, y, 5); g.addColorStop(0, '#d79bf0'); g.addColorStop(1, '#8a3fb0');
+  ctx.beginPath(); ctx.arc(x, y, 4.5, 0, 7); ctx.fillStyle = g; ctx.fill();
+}
+function drawBike3D() {
+  const K = R / 17, hl = 22, O = '#ff7a1a', P = '#b56fd0', B = '#2c4fc0', N = 'rgba(0,0,0,0)';
+  ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); ctx.scale(K, K);
+  tube([[-hl, 0], [-3, -7]], P, 5);                                                   // swing arm ungu
+  wheel3(-hl, 0, b.wr); wheel3(hl, 0, b.wr);
+  tube([[-12, -17], [-50, -9]], '#1b1b26', 1.3, N);                                   // ekor tipis
+  shade([[-38, -19], [-6, -21], [-3, -13], [-34, -12]], '#c98ae3', '#9d52bd');         // dudukan ungu
+  shade([[-24, -24], [-2, -28], [10, -9], [-6, -9]], '#ff8a2a', '#f06a10');            // baji oranye
+  shade([[0, -31], [14, -35], [19, -12], [7, -5], [0, -9]], '#5a5f6e', '#3b3e4b');     // panel gelap
+  tube([[3, -10], [14, -27]], P, 2.4);
+  tube([[hl, 0], [14, -31]], O, 6);                                                   // garpu oranye
+  tube([[hl, -4], [15, -33]], '#3b3e4b', 1.4, N);
+  shade([[9, -38], [17, -40], [19, -33], [11, -31]], '#ff8a2a', '#e85d0a');            // klem stang
+  tube([[15, -37], [22, -39]], '#8d93a3', 2.2);
+  tube([[-10, -26], [3, -21], [5, -11]], B, 8); tube([[-8, -25], [3, -21]], '#f3f6ff', 1.6, N);   // kaki
+  shade([[-2, -14], [10, -12], [15, -5], [0, -2]], '#ffffff', '#c9cfdc'); tube([[2, -7], [11, -6]], '#1b1b26', 1.6, N); // sepatu
+  tube([[-10, -26], [-6, -46]], B, 12); tube([[-9, -29], [-6, -44]], '#f3f6ff', 3, N);              // badan + garis putih
+  tube([[-6, -45], [19, -38]], B, 5); tube([[-4, -44], [8, -41]], '#f3f6ff', 1.5, N);               // lengan
+  ctx.beginPath(); ctx.arc(21, -38, 3.2, 0, 7); ctx.fillStyle = '#14141c'; ctx.fill();               // sarung tangan
+  const g = ctx.createLinearGradient(0, -68, 0, -46); g.addColorStop(0, '#74dcff'); g.addColorStop(1, '#2b86d0');
+  ctx.beginPath(); ctx.arc(2, -57, 11, 0, 7); ctx.fillStyle = g; ctx.fill();                          // helm biru
+  ctx.beginPath(); ctx.arc(2, -57, 10, -.6, .55); ctx.strokeStyle = '#18264a'; ctx.lineWidth = 4; ctx.stroke(); // pita visor
+  ctx.beginPath(); ctx.ellipse(10, -58, 2.6, 1.5, 0, 0, 7); ctx.fillStyle = '#ffb347'; ctx.fill();   // kilau goggle
+  shade([[-6, -66], [3, -73], [1, -65]], '#2a2a36', '#14141c');                                       // sirip helm
+  ctx.restore();
+}
+function drawBike() { if (style === '3d') drawBike3D(); else drawBikeCartoon(); }
 function cactus(x, y, k) { ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.strokeStyle = '#3f8f45'; ctx.lineCap = 'round'; ctx.lineWidth = 16;
   ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -80); ctx.stroke(); ctx.lineWidth = 10; ctx.beginPath();
   ctx.moveTo(0, -30); ctx.lineTo(-22, -30); ctx.lineTo(-22, -55); ctx.moveTo(0, -45); ctx.lineTo(22, -45); ctx.lineTo(22, -68); ctx.stroke(); ctx.restore(); }
@@ -261,6 +319,7 @@ function pine(x, y, k) { ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.f
 function deadTree(x, y, k) { ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.strokeStyle = '#1c0f0f'; ctx.lineCap = 'round'; ctx.lineWidth = 10;
   ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(4, -70); ctx.moveTo(4, -45); ctx.lineTo(30, -75); ctx.moveTo(2, -58); ctx.lineTo(-24, -90); ctx.stroke(); ctx.restore(); }
 function decor(px, i) {
+  if (lv.deco === 'none') return;
   const k = .9 + (i % 3) * .1, y = gy(px) + 4, y2 = gy(px + 260) + 2;
   if (lv.deco === 'palm') { palm(px, y, k, i % 2 ? 1 : -1); umbrella(px + 260, y2, i % 2 ? '#ffc800' : '#2f9fd8'); }
   else if (lv.deco === 'cactus') { cactus(px, y, k); cactus(px + 260, y2, .6); }
@@ -282,6 +341,11 @@ function backdrop() {
   const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, lv.sky[0]); g.addColorStop(.6, lv.sky[1]);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = lv.sun; ctx.beginPath(); ctx.arc(W * .1, H * .08, 60 * S + 20, 0, 7); ctx.fill();
+  if (style === '3d') {   // awan lembut berparalaks
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; const cs = 380 * S, co = (camX * .05 * S) % cs;
+    for (let x = -cs - co; x < W + cs; x += cs) { const k = Math.round((x + co) / cs), y = (60 + ((k * 71) % 90 + 90) % 90) * S;
+      [[0, 0, 38], [36, -10, 30], [70, 2, 34], [30, 12, 30]].forEach(c => { ctx.beginPath(); ctx.arc(x + c[0] * S, y + c[1] * S, c[2] * S, 0, 7); ctx.fill(); }); }
+  }
   const hy = (330 - camY * .5) * S;
   ctx.fillStyle = lv.farC[0]; ctx.fillRect(0, hy, W, H - hy);
   if (lv.far === 'sea') {
@@ -325,11 +389,19 @@ function draw() {
   obs.forEach(o => { xs.push(o.x - o.hw - 16); if (o.t === 'hole') xs.push(o.x0, o.x1); });
   xs.forEach(e => { if (e > x0 - 10 && e < x1 + 10) pts.push([e - .01, gy(e - .01)], [e + .01, gy(e + .01)]); });
   pts.sort((p, q) => p[0] - q[0]);
-  ctx.fillStyle = lv.sand[0]; ctx.beginPath(); ctx.moveTo(pts[0][0], bot);
+  const d3 = style === '3d', q = lv.g3d;
+  let fillS = lv.sand[0];
+  if (d3) { fillS = ctx.createLinearGradient(0, camY, 0, bot); fillS.addColorStop(0, q.soil[0]); fillS.addColorStop(1, q.soil[1]); }
+  ctx.fillStyle = fillS; ctx.beginPath(); ctx.moveTo(pts[0][0], bot);
   pts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.lineTo(pts[pts.length - 1][0], bot); ctx.closePath(); ctx.fill();
   ctx.lineJoin = 'round';
   const edge = (off, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); pts.forEach((p, n) => ctx[n ? 'lineTo' : 'moveTo'](p[0], p[1] + off)); ctx.stroke(); };
-  edge(16, lv.sand[1], 10); edge(0, lv.sand[2], 4);
+  if (d3) {   // lapisan rumput/permukaan berundak + tepi bercahaya
+    ctx.save(); ctx.clip();
+    edge(24, q.mid, 50); edge(11, q.top, 24);
+    ctx.setLineDash([7, 9]); edge(50, q.mid, 7); ctx.setLineDash([]);
+    ctx.restore(); edge(2, q.rim, 5);
+  } else { edge(16, lv.sand[1], 10); edge(0, lv.sand[2], 4); }
 
   for (let i = Math.floor((x0 - 100) / 520); i <= Math.ceil(x1 / 520); i++) {
     const px = 250 + i * 520 + ((i * 97) % 160 + 160) % 160;
@@ -345,7 +417,7 @@ function draw() {
     ctx.beginPath(); ctx.arc(k.x, k.y, 9, 0, 7); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#fff3b0'; ctx.fillRect(k.x - 1.5, k.y - 5, 3, 10);
   }
-  if (!b.g && state !== 'menu') {   // bayangan di tanah: penanda titik pendaratan
+  if ((style === '3d' || !b.g) && state !== 'menu') {   // bayangan di tanah: penanda titik pendaratan
     const gg = gy(b.x), hg = gg - b.y;
     ctx.fillStyle = 'rgba(0,0,0,' + clamp(.35 - hg / 900, .1, .35) + ')'; ctx.beginPath(); ctx.ellipse(b.x, gg + 1, 42, 7, 0, 0, 7); ctx.fill();
   }
@@ -379,6 +451,9 @@ document.querySelectorAll('#touch button').forEach(el => {
   el.addEventListener('contextmenu', e => e.preventDefault());
 });
 $('play').addEventListener('click', () => start(nextN));
+const sb = $('style'), setStyle = () => { sb.textContent = 'Tampilan: ' + (style === '3d' ? '3D' : 'Kartun'); };
+setStyle();
+sb.addEventListener('click', () => { style = style === '3d' ? 'cartoon' : '3d'; try { localStorage.setItem('motoStyle', style); } catch (e) {} setStyle(); });
 renderLevels();
 $('mute').addEventListener('click', () => { $('mute').textContent = Sfx.toggleMute() ? '🔇' : '🔊'; });
 document.addEventListener('visibilitychange', () => { if (document.hidden) Sfx.stopEngine(); });
