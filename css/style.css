@@ -55,3 +55,30 @@ h1 b{color:var(--sand)}h1 em{color:var(--orange);font-style:normal;font-size:1.2
   font-size:clamp(13px,3vw,16px);color:var(--bone);text-shadow:1px 1px 0 var(--ink);pointer-events:none}
 
 .ghost{padding:6px 14px;font-size:clamp(12px,3vw,15px);background:rgba(244,239,230,.15);color:var(--bone);border:2px solid var(--bone);border-radius:10px}
+
+#pause{pointer-events:auto;width:42px;height:42px;border-radius:50%;background:var(--bone);border:2px solid var(--ink);font-size:14px;color:var(--ink);letter-spacing:-2px}
+#lives{position:fixed;left:max(12px,env(safe-area-inset-left));top:calc(max(10px,env(safe-area-inset-top)) + 94px);font-size:clamp(16px,3.6vw,22px);color:#ff3b4f;text-shadow:1px 1px 0 var(--ink);pointer-events:none;letter-spacing:2px}
+#nos.rech i{background:#6f8fae}
+#pausebox{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(42,33,24,.6);z-index:5}
+#pausebox.show{display:flex}
+#pausebox h2{margin:0 0 6px;font-size:clamp(36px,9vw,72px);color:var(--bone);-webkit-text-stroke:2px var(--ink);text-shadow:4px 4px 0 var(--ink)}
+#pausebox button{min-width:min(70vw,260px);padding:12px 30px;font-size:clamp(18px,4.6vw,26px);background:var(--orange);color:var(--bone);border:3px solid var(--ink);border-radius:14px;box-shadow:0 5px 0 var(--ink)}
+#pausebox button#restart{background:var(--bone);color:var(--ink)}
+#levels{gap:10px}
+#levels button.star{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 12px;background:rgba(244,239,230,.1);color:var(--bone);border:2px solid transparent;border-radius:14px;min-width:92px}
+#levels button.star span{font-size:clamp(13px,3.2vw,16px)}
+#levels button.star em{font-style:normal;font-size:11px;opacity:.85}
+#levels button.star:hover:not(:disabled){border-color:var(--bone);background:rgba(244,239,230,.2)}
+#levels button.star:disabled{opacity:.4;cursor:not-allowed}
+
+/* layar pendek (HP landscape): menu dipadatkan & bisa digulir */
+#overlay{overflow-y:auto;justify-content:safe center}
+@media (max-height:620px){
+  h1{font-size:clamp(26px,9vh,60px)}
+  #overlay{gap:6px;padding:8px 14px}
+  #overlay p{font-size:12px;max-width:62ch}
+  #levels button.star{padding:3px 8px;min-width:78px}
+  #levels button.star svg{width:32px;height:32px}
+  #play{padding:7px 30px;font-size:18px;margin-top:2px}
+  .keys{display:none!important}
+}
