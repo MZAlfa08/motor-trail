@@ -3,7 +3,7 @@
 const cv = document.getElementById('game'), ctx = cv.getContext('2d');
 const $ = id => document.getElementById(id);
 let GOAL = 9000;
-const R = 17, L = 44, GRAV = 900, ACC = 560, MAXV = 620, NOSACC = 900, NOSMAX = 880;
+const R = 17, L = 62, GRAV = 900, ACC = 560, MAXV = 620, NOSACC = 900, NOSMAX = 880;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
@@ -158,8 +158,9 @@ function update(dt) {
   if (dead) b.a += b.av * dt;
 
   if (!dead && state === 'play') {
-    const K = R / 17, hx = b.x + 6 * K * c + 52 * K * s, hy = b.y + 6 * K * s - 52 * K * c;   // kepala pengendara
-    if (hy + 11 * K > gy(hx)) crash();
+    const hxL = style === '3d' ? -4 : 8, hyL = style === '3d' ? -66 : -58;   // posisi helm di bingkai motor
+    const hx = b.x + hxL * c - hyL * s, hy = b.y + hxL * s + hyL * c;
+    if (hy + 9 > gy(hx)) crash();
     if (nosOn) for (let k = 0; k < 2; k++) parts.push({ x: rx - 6 * c, y: ry - 6 * s - 6, vx: -260 * c + b.vx * .3 + (Math.random() - .5) * 60,
       vy: -260 * s + (Math.random() - .5) * 60, life: .5, c: k ? '#ffd35c' : '#f0541e', f: 1 });
     maxX = Math.max(maxX, b.x);
@@ -233,7 +234,7 @@ function wheel(x, y, rot) {
   ctx.beginPath(); ctx.arc(x, y, 3.5, 0, 7); ctx.fillStyle = '#8f959b'; ctx.fill();
 }
 function drawBikeCartoon() {
-  const K = R / 17, hl = 22, O = '#f0541e', O2 = '#c93a10', G = '#7ed321', D = '#2a2118', S1 = '#c9ced3';
+  const K = R / 17, hl = L / 2, O = '#f0541e', O2 = '#c93a10', G = '#7ed321', D = '#2a2118', S1 = '#c9ced3';
   ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); ctx.scale(K, K);
   wheel(-hl, 0, b.wr); wheel(hl, 0, b.wr);
   ctx.beginPath(); ctx.arc(hl, 0, 22, -2.5, -.55); ctx.lineCap = 'round';                                  // spakbor depan
@@ -270,43 +271,66 @@ function shade(pts, c0, c1) {
   const ys = pts.map(p => p[1]), g = ctx.createLinearGradient(0, Math.min(...ys), 0, Math.max(...ys)); g.addColorStop(0, c0); g.addColorStop(1, c1);
   ctx.beginPath(); pts.forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo'](p[0], p[1])); ctx.closePath(); ctx.lineJoin = 'round'; ctx.fillStyle = g; ctx.fill();
 }
-function wheel3(x, y, rot) {
-  ctx.beginPath(); ctx.arc(x, y, 14, 0, 7); ctx.strokeStyle = '#34363f'; ctx.lineWidth = 7; ctx.stroke();                       // ban
-  ctx.beginPath(); ctx.arc(x - .8, y - .8, 14, 3.4, 5.2); ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 3; ctx.stroke(); // kilau
-  ctx.setLineDash([3, 4]); ctx.lineDashOffset = -rot * 17; ctx.beginPath(); ctx.arc(x, y, 17, 0, 7);
-  ctx.strokeStyle = '#23252c'; ctx.lineWidth = 2.2; ctx.stroke(); ctx.setLineDash([]);                                         // gerigi
-  ctx.beginPath(); ctx.arc(x, y, 10.2, 0, 7); ctx.strokeStyle = '#ff6a1a'; ctx.lineWidth = 1.6; ctx.stroke();                  // pelek oranye
-  ctx.beginPath(); for (let i = 0; i < 18; i++) { const a = rot + i * Math.PI / 9;
-    ctx.moveTo(x + Math.cos(a) * 4.5, y + Math.sin(a) * 4.5); ctx.lineTo(x + Math.cos(a + .25) * 10, y + Math.sin(a + .25) * 10); }
-  ctx.strokeStyle = '#1b1b26'; ctx.lineWidth = .8; ctx.stroke();
-  const g = ctx.createRadialGradient(x - 1, y - 1, 1, x, y, 5); g.addColorStop(0, '#d79bf0'); g.addColorStop(1, '#8a3fb0');
-  ctx.beginPath(); ctx.arc(x, y, 4.5, 0, 7); ctx.fillStyle = g; ctx.fill();
+/* Motor + pengendara gaya 3D berbayang. Digambar langsung dalam koordinat gambar referensi (1920x1080),
+   lalu ditransformasi ke bingkai motor: roda belakang/depan = RW/FW. */
+const RW = [990, 800], FW = [1492, 430], MX = 1241, MY = 615, TH = Math.atan2(-370, 502);
+function wheelRef(c, rot) {
+  const x = c[0], y = c[1];
+  const g = ctx.createRadialGradient(x, y, 110, x, y, 172); g.addColorStop(0, '#5a5d68'); g.addColorStop(1, '#383b44');
+  ctx.beginPath(); ctx.arc(x, y, 172, 0, 7); ctx.moveTo(x + 112, y); ctx.arc(x, y, 112, 0, 7, true); ctx.fillStyle = g; ctx.fill('evenodd');   // ban (tengah tembus)
+  ctx.setLineDash([24, 17]); ctx.lineDashOffset = -rot * 172; ctx.beginPath(); ctx.arc(x, y, 164, 0, 7);
+  ctx.strokeStyle = 'rgba(20,21,27,.3)'; ctx.lineWidth = 16; ctx.stroke(); ctx.setLineDash([]);                                          // gerigi
+  ctx.beginPath(); ctx.arc(x, y, 111, 0, 7); ctx.strokeStyle = '#ff5a1f'; ctx.lineWidth = 8; ctx.stroke();                                   // pelek oranye
+  ctx.beginPath(); for (let i = 0; i < 12; i++) { const a = rot + i * Math.PI / 6;
+    ctx.moveTo(x + Math.cos(a) * 50, y + Math.sin(a) * 50); ctx.lineTo(x + Math.cos(a + .08) * 84, y + Math.sin(a + .08) * 84);
+    ctx.lineTo(x + Math.cos(a - .04) * 108, y + Math.sin(a - .04) * 108); ctx.moveTo(x + Math.cos(a + .08) * 84, y + Math.sin(a + .08) * 84);
+    ctx.lineTo(x + Math.cos(a + .22) * 108, y + Math.sin(a + .22) * 108); }
+  ctx.lineCap = 'round'; ctx.strokeStyle = '#16161e'; ctx.lineWidth = 7; ctx.stroke();
+  const h = ctx.createRadialGradient(x - 12, y - 12, 4, x, y, 50); h.addColorStop(0, '#cf94ee'); h.addColorStop(1, '#8a45b8');
+  ctx.beginPath(); ctx.arc(x, y, 48, 0, 7); ctx.fillStyle = h; ctx.fill();
+}
+function bikeArt() {
+  const O = '#ff7a14', P = '#b76fd1', B = '#2f4fbf', W = '#eaf1ff', N = 'rgba(0,0,0,0)';
+  wheelRef(RW, b.wr); wheelRef(FW, b.wr);
+  tube([[660, 655], [920, 582]], '#15151c', 5, N);                                                        // ekor tipis
+  tube([[1135, 668], [995, 800]], P, 46);                                                                 // swing arm ungu
+  tube([[885, 624], [1125, 652]], P, 54);                                                                 // dudukan ungu
+  shade([[1195, 400], [1245, 382], [1262, 420], [1292, 560], [1268, 622], [1210, 640], [1150, 610], [1170, 520]], '#5a5e6c', '#3a3d49'); // panel gelap
+  tube([[1262, 480], [1188, 598]], P, 14, N);
+  shade([[915, 580], [1072, 548], [1150, 665], [990, 640]], '#ff8f2c', '#f2640c');                         // baji oranye
+  tube([[1215, 312], [1124, 540]], O, 48);                                                                // tabung rangka
+  tube([[1255, 312], [1350, 360]], '#4a4d59', 10, N);                                                     // batang garpu
+  tube([[1350, 368], [1500, 448]], O, 54);                                                                // garpu oranye
+  shade([[1180, 288], [1236, 268], [1258, 306], [1206, 328]], '#ff9a2a', '#f0600a');                      // klem
+  tube([[1160, 264], [1200, 252]], '#8d93a3', 14);                                                        // stang
+  tube([[868, 432], [990, 488]], B, 92, 'rgba(255,255,255,.16)'); tube([[990, 488], [1105, 578]], B, 62, 'rgba(255,255,255,.16)');                         // kaki biru
+  tube([[872, 428], [1040, 497]], W, 22, N);                                                              // garis putih paha
+  shade([[1085, 592], [1135, 562], [1190, 610], [1256, 616], [1250, 652], [1196, 692], [1150, 690], [1100, 652]], '#ffffff', '#cfd5e2'); // sepatu
+  shade([[1085, 586], [1138, 560], [1162, 598], [1108, 626]], '#2a2a36', '#14141c');
+  tube([[1160, 640], [1235, 640]], '#14141c', 10, N);
+  const tg = ctx.createLinearGradient(770, 0, 930, 0); tg.addColorStop(0, '#2a46b8'); tg.addColorStop(1, '#3d62d4');
+  ctx.beginPath(); ctx.moveTo(772, 235); ctx.bezierCurveTo(768, 320, 790, 400, 850, 452); ctx.lineTo(910, 432);
+  ctx.bezierCurveTo(928, 360, 892, 300, 926, 228); ctx.bezierCurveTo(905, 188, 840, 172, 790, 196); ctx.closePath();
+  ctx.fillStyle = tg; ctx.fill();                                                                                  // badan
+  tube([[798, 228], [832, 322], [884, 392]], W, 44, N);                                                   // garis putih badan
+  tube([[838, 214], [1118, 247]], B, 42, 'rgba(255,255,255,.16)');                                                                 // lengan
+  tube([[945, 222], [956, 264]], W, 20, N);                                                               // manset
+  ctx.beginPath(); ctx.arc(1132, 246, 26, 0, 7); ctx.fillStyle = '#14141c'; ctx.fill();                   // sarung tangan
+  tube([[1160, 262], [1188, 254]], '#8d93a3', 12, N);
+  shade([[782, 160], [828, 160], [830, 190], [784, 188]], '#2a2a36', '#14141c');                          // leher
+  const g = ctx.createLinearGradient(0, 30, 0, 180); g.addColorStop(0, '#46c8f8'); g.addColorStop(1, '#3a62d0');
+  ctx.beginPath(); ctx.ellipse(808, 102, 88, 76, -.15, 0, 7); ctx.fillStyle = g; ctx.fill();                      // helm
+  ctx.save(); ctx.clip();
+  tube([[700, 140], [900, 112]], '#14182e', 22, N);                                                               // pita visor
+  ctx.beginPath(); ctx.ellipse(872, 98, 27, 27, -.3, 0, 7); ctx.fillStyle = '#1a1f3a'; ctx.fill();                  // kaca wajah
+  ctx.restore();
+  ctx.beginPath(); ctx.ellipse(856, 86, 14, 9, -.5, 0, 7); ctx.fillStyle = '#ffb13a'; ctx.fill();                  // kilau goggle
+  shade([[868, 122], [898, 118], [902, 152], [872, 162]], '#4a6fd0', '#2a3a78');                                   // dagu helm
+  shade([[786, 82], [842, 10], [834, 98]], '#2a2a36', '#0f0f16');                                                  // sirip helm
 }
 function drawBike3D() {
-  const K = R / 17, hl = 22, O = '#ff7a1a', P = '#b56fd0', B = '#2c4fc0', N = 'rgba(0,0,0,0)';
-  ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); ctx.scale(K, K);
-  tube([[-hl, 0], [-3, -7]], P, 5);                                                   // swing arm ungu
-  wheel3(-hl, 0, b.wr); wheel3(hl, 0, b.wr);
-  tube([[-12, -17], [-50, -9]], '#1b1b26', 1.3, N);                                   // ekor tipis
-  shade([[-38, -19], [-6, -21], [-3, -13], [-34, -12]], '#c98ae3', '#9d52bd');         // dudukan ungu
-  shade([[-24, -24], [-2, -28], [10, -9], [-6, -9]], '#ff8a2a', '#f06a10');            // baji oranye
-  shade([[0, -31], [14, -35], [19, -12], [7, -5], [0, -9]], '#5a5f6e', '#3b3e4b');     // panel gelap
-  tube([[3, -10], [14, -27]], P, 2.4);
-  tube([[hl, 0], [14, -31]], O, 6);                                                   // garpu oranye
-  tube([[hl, -4], [15, -33]], '#3b3e4b', 1.4, N);
-  shade([[9, -38], [17, -40], [19, -33], [11, -31]], '#ff8a2a', '#e85d0a');            // klem stang
-  tube([[15, -37], [22, -39]], '#8d93a3', 2.2);
-  tube([[-10, -26], [3, -21], [5, -11]], B, 8); tube([[-8, -25], [3, -21]], '#f3f6ff', 1.6, N);   // kaki
-  shade([[-2, -14], [10, -12], [15, -5], [0, -2]], '#ffffff', '#c9cfdc'); tube([[2, -7], [11, -6]], '#1b1b26', 1.6, N); // sepatu
-  tube([[-10, -26], [-6, -46]], B, 12); tube([[-9, -29], [-6, -44]], '#f3f6ff', 3, N);              // badan + garis putih
-  tube([[-6, -45], [19, -38]], B, 5); tube([[-4, -44], [8, -41]], '#f3f6ff', 1.5, N);               // lengan
-  ctx.beginPath(); ctx.arc(21, -38, 3.2, 0, 7); ctx.fillStyle = '#14141c'; ctx.fill();               // sarung tangan
-  const g = ctx.createLinearGradient(0, -68, 0, -46); g.addColorStop(0, '#74dcff'); g.addColorStop(1, '#2b86d0');
-  ctx.beginPath(); ctx.arc(2, -57, 11, 0, 7); ctx.fillStyle = g; ctx.fill();                          // helm biru
-  ctx.beginPath(); ctx.arc(2, -57, 10, -.6, .55); ctx.strokeStyle = '#18264a'; ctx.lineWidth = 4; ctx.stroke(); // pita visor
-  ctx.beginPath(); ctx.ellipse(10, -58, 2.6, 1.5, 0, 0, 7); ctx.fillStyle = '#ffb347'; ctx.fill();   // kilau goggle
-  shade([[-6, -66], [3, -73], [1, -65]], '#2a2a36', '#14141c');                                       // sirip helm
-  ctx.restore();
+  ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); const k = R / 172; ctx.scale(k, k); ctx.rotate(-TH); ctx.translate(-MX, -MY);
+  bikeArt(); ctx.restore();
 }
 function drawBike() { if (style === '3d') drawBike3D(); else drawBikeCartoon(); }
 function cactus(x, y, k) { ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.strokeStyle = '#3f8f45'; ctx.lineCap = 'round'; ctx.lineWidth = 16;
