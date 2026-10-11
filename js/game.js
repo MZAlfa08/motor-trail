@@ -32,7 +32,7 @@ const THEMES = {
     mt: [{ par: .03, seed: 3, h: 360, c0: '#7f94b6', c1: '#dfe9f4', snow: 230 }, { par: .06, seed: 6, h: 270, c0: '#6c82a6', c1: '#c9d8ea', snow: 150 }, { par: .1, seed: 9, h: 190, c0: '#566f94', c1: '#b5c8de', snow: 90 }] }
 };
 const LEVELS = [
-  { name: 'Pantai', tag: 'Mudah', goal: 46000, amp: .75, ph: 0, d: [1, 3.2], th: 'beach', drag: .25 },
+  { name: 'Pantai Sejuk', tag: 'Mudah', goal: 46000, amp: .75, ph: 0, d: [1, 3.2], th: 'beach', drag: .25 },
   { name: 'Padang Hijau', tag: 'Agak susah', goal: 52000, amp: 1.0, ph: 3, d: [3, 6.2], th: 'green', drag: .25 },
   { name: 'Gunung Salju', tag: 'Sangat susah', goal: 58000, amp: 1.2, ph: 5, d: [5.5, 9.5], th: 'snow', drag: .1, brake: 450 }
 ];
