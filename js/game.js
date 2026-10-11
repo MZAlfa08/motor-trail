@@ -19,6 +19,7 @@ function sprite(key, w, h, ax, ay, fn, sc) {   // gambar sekali ke kanvas kecil,
   return SP[key] = { c, w, h, ax, ay };
 }
 function blit(s, x, y, k, f, sx) { ctx.save(); ctx.translate(x, y); ctx.scale(k * f * (sx || 1), k); ctx.drawImage(s.c, -s.ax, -s.ay, s.w, s.h); ctx.restore(); }
+const nosBtn = document.querySelector('#touch .c-nos'), jumpBtn = document.querySelector('#touch .c-jump');
 const hc = {}, setT = (id, v) => { if (hc[id] !== v) { hc[id] = v; $(id).textContent = v; } }, setW = (id, v) => { if (hc[id] !== v) { hc[id] = v; $(id).style.width = v; } };
 
 /* ---------- tema & level (3 bintang) ---------- */
@@ -94,15 +95,18 @@ function loadLevel(n) {
   }
   const put = (t, px, py) => items.push({ t, x: px, y: py, got: 0 });
   for (const z of zones) {
-    if (z.t === 'mound') { mines.filter(m => m.x > z.c && m.x <= z.x1).forEach(m => put('big', m.x, g0(m.x) - 108));
+    if (z.t === 'mound') { mines.filter(m => m.x > z.c && m.x <= z.x1).forEach(m => put('big', m.x, g0(m.x) - 90));
       for (let i = 0; i < 5; i++) { const cx = z.c - 90 + i * 45; put('c', cx, g0(cx) - 36 - 28 * Math.sin(Math.PI * i / 4)); } }
     else if (z.t === 'loop') for (let i = 1; i < 8; i++) { const th2 = i * Math.PI / 4; put('c', z.ex + z.r * Math.sin(th2) + 46 * th2 / (2 * Math.PI), z.y0 - R - z.r * (1 - Math.cos(th2))); }
-    else for (let i = 0; i < 5; i++) { const cx = (z.x0 + z.x1) / 2 - 90 + i * 45; put('c', cx, g0(cx) - 62 - 20 * Math.sin(Math.PI * i / 4)); }
+    else for (let i = 0; i < 7; i++) {   // koin searah jalur motor (ikut kontur lumpur, batu, jalan bergerigi, jembatan)
+      const cx = z.x0 + 60 + (z.x1 - z.x0 - 120) * i / 6; put('c', cx, (z.t === 'bridge' ? deck(z, cx) : g0(cx)) - 38);
+    }
   }
   for (let cx = 500; cx < GOAL - 300; cx += 420 + r() * 160) { if (zoneAt(cx) || zoneAt(cx + 200) || zoneAt(cx - 60)) continue; for (let i = 0; i < 5; i++) put('c', cx + i * 40, g0(cx + i * 40) - 34); }
-  const clear = (px, t, step) => { while (zoneAt(px) || zoneAt(px + 80) || zoneAt(px - 80)) px += 60; put(t, px, g0(px) - 40); };
+  const clear = (px, t) => { while (zoneAt(px) || zoneAt(px + 80) || zoneAt(px - 80)) px += 60; put(t, px, g0(px) - 40); };
   for (let nx = 2600; nx < GOAL - 600; nx += 3000) clear(nx, 'nos');
   for (let hx = 6000; hx < GOAL - 600; hx += 7800) clear(hx, 'life');
+  for (let jx = 4300; jx < GOAL - 800; jx += 6800) clear(jx, 'jump');
   items.sort((p, q) => p.x - q.x);
 }
 loadLevel(0);
@@ -110,7 +114,7 @@ loadLevel(0);
 /* ---------- state ---------- */
 const K = { gas: 0, brake: 0, fwd: 0, back: 0, nos: 0 };
 let b, state = 'menu', time = 0, camX = 0, camY = 0, parts = [], endTimer = 0, paused = false;
-let runScore = 0, nextN = 0, done = [false, false, false], bestScore = 0, bonus = 0, nitro = 100, rech = false, airRot = 0, wheelT = 0, maxX = 120, zi = 0, lives = 3, invul = 0, cpX = 120, lp = null;
+let runScore = 0, nextN = 0, done = [false, false, false], bestScore = 0, bonus = 0, nitro = 100, rech = false, airRot = 0, wheelT = 0, maxX = 120, zi = 0, lives = 3, invul = 0, cpX = 120, lp = null, jumps = 0, hj = false;
 try { bestScore = +localStorage.getItem('motoBeachScore') || 0; done = JSON.parse(localStorage.getItem('motoBeachDone') || '[false,false,false]'); } catch (e) {}
 if (!Array.isArray(done) || done.length !== 3) done = [false, false, false];
 nextN = Math.max(0, done.indexOf(false)); if (done.indexOf(false) < 0) nextN = 0;
@@ -125,31 +129,34 @@ b = newBike(120);
 function hud() {
   setT('time', time.toFixed(1)); setT('score', String(runScore + total())); setW('nosbar', Math.round(nitro) + '%');
   setT('lives', '\u2764'.repeat(Math.max(0, lives))); setW('prog', Math.round(clamp((b.x - 120) / (GOAL - 120) * 100, 0, 100) * 10) / 10 + '%');
-  if (hc.rech !== rech) { hc.rech = rech; $('nos').classList.toggle('rech', rech); }
+  if (hc.rech !== rech) { hc.rech = rech; $('nos').classList.toggle('rech', rech); nosBtn.classList.toggle('off', rech); setT('noslab', rech ? 'ISI ULANG...' : 'NOS'); }
+  if (hc.jmp !== jumps) { hc.jmp = jumps; $('jumpind').classList.toggle('show', jumps > 0); jumpBtn.classList.toggle('off', jumps < 1); jumpBtn.classList.toggle('ready', jumps > 0); }
 }
 const STAR = f => '<svg viewBox="0 0 24 24" width="46" height="46"><polygon points="12,2 14.9,8.6 22,9.3 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.3 9.1,8.6" fill="' + (f ? '#ffc800' : 'none') + '" stroke="' + (f ? '#8a5a00' : '#f4efe6') + '" stroke-width="1.6" stroke-linejoin="round"/></svg>';
 function renderLevels() {
   const box = $('levels'); box.innerHTML = '';
   LEVELS.forEach((l, i) => {
-    const open = i === 0 || done[i - 1], bt = document.createElement('button'); bt.className = 'star' + (open ? '' : ' lock');
-    bt.innerHTML = STAR(done[i]) + '<span>' + (i + 1) + '. ' + l.name + '</span><em>' + l.tag + '</em>';
+    const open = i === 0 || done[i - 1], bt = document.createElement('button'); bt.className = 'card' + (done[i] ? ' done' : '');
+    bt.innerHTML = STAR(done[i]) + '<b>' + (i + 1) + '. ' + l.name + '</b><small>' + l.tag + '</small>';
     bt.disabled = !open; bt.onclick = () => { runScore = 0; start(i); }; box.appendChild(bt);
   });
 }
-function showOverlay(title, msg, btn) {
-  $('msg').textContent = title + ' ' + msg; $('best').textContent = bestScore ? 'Skor terbaik: ' + bestScore : '';
+function showMenu() { $('overlay').dataset.mode = 'menu'; $('play').textContent = 'Main'; renderLevels(); $('overlay').classList.add('show'); }
+function showResult(mode, title, sub, stats, btn) {
+  $('overlay').dataset.mode = mode; $('rtitle').textContent = title; $('rsub').textContent = sub;
+  $('rstats').innerHTML = stats.map(p => '<div><span>' + p[0] + '</span><b>' + p[1] + '</b></div>').join('');
   $('play').textContent = btn; renderLevels(); $('overlay').classList.add('show');
 }
 function setPause(v) { if (v === paused || state === 'menu' || state === 'over' || state === 'done') return; paused = v; $('pausebox').classList.toggle('show', v); if (v) Sfx.stopEngine(); }
 function start(n) {
   loadLevel(n); lives = 3; cpX = 120; invul = 0; b = newBike(120); parts = []; state = 'play'; time = 0; paused = false; rag = null; lp = null;
-  susp = 0; suspV = 0; trick = 0; trickT = 0; airT = 0; prevSl = null; bonus = 0; nitro = 100; rech = false; airRot = 0; wheelT = 0; maxX = 120; zi = 0;
+  susp = 0; suspV = 0; trick = 0; trickT = 0; airT = 0; prevSl = null; jumps = 0; hj = false; bonus = 0; nitro = 100; rech = false; airRot = 0; wheelT = 0; maxX = 120; zi = 0;
   $('overlay').classList.remove('show'); $('pausebox').classList.remove('show'); Sfx.init();
   $('lvname').textContent = 'Level ' + (n + 1) + ' \u00b7 ' + lv.name; pop('LEVEL ' + (n + 1) + ' \u00b7 ' + lv.name.toUpperCase()); hud();
 }
 function crash() {
   if (state !== 'play' || invul > 0) return;
-  lives--; state = 'crash'; endTimer = style === '3d' ? 1.6 : .9; Sfx.crash(); Sfx.stopEngine();
+  lives--; hj = false; state = 'crash'; endTimer = style === '3d' ? 1.6 : .9; Sfx.crash(); Sfx.stopEngine();
   for (let i = 0; i < 20; i++) parts.push({ x: b.x, y: b.y - 20, vx: (Math.random() - .3) * 300 + b.vx * .4, vy: -Math.random() * 350, life: 1, c: ['#f0541e', '#2a2118', '#7ed321', '#f4efe6'][i % 4] });
   if (style === '3d') {
     const k = R / 172, v0 = [868 - MX, 436 - MY], cs = Math.cos(-TH), sn = Math.sin(-TH), c = Math.cos(b.a), s = Math.sin(b.a);
@@ -159,7 +166,7 @@ function crash() {
   hud();
 }
 function respawn() {
-  b = newBike(cpX); parts = []; rag = null; state = 'play'; invul = 2.2; susp = 0; suspV = 0; trick = 0; trickT = 0; airT = 0; prevSl = null; lp = null; airRot = 0;
+  hj = false; b = newBike(cpX); parts = []; rag = null; state = 'play'; invul = 2.2; susp = 0; suspV = 0; trick = 0; trickT = 0; airT = 0; prevSl = null; lp = null; airRot = 0;
   zi = 0; while (zi < zones.length && zones[zi].x1 + 40 < cpX) zi++;
   pop('SISA NYAWA ' + lives); hud();
 }
@@ -167,13 +174,31 @@ function finish() {
   state = 'done'; Sfx.stopEngine(); Sfx.win();
   const tb = Math.max(0, Math.round((130 - time) * 10)); bonus += tb; saveBest(); runScore += total(); bonus = 0; maxX = 120;
   done[level] = true; try { localStorage.setItem('motoBeachDone', JSON.stringify(done)); } catch (e) {}
-  if (level < LEVELS.length - 1) { nextN = level + 1; showOverlay('Level ' + (level + 1) + ' selesai! \u2B50', 'Skor ' + runScore + ' (bonus waktu +' + tb + ')', 'Level berikutnya \u25B6'); }
-  else { nextN = 0; const fin = runScore; runScore = 0; showOverlay('TAMAT! \uD83C\uDFC6', 'Semua bintang didapat. Total skor ' + fin, 'Main dari awal'); }
+  const st = [['Skor', runScore], ['Bonus waktu', '+' + tb], ['Waktu', time.toFixed(1) + ' dtk'], ['Terbaik', bestScore]];
+  if (level < LEVELS.length - 1) { nextN = level + 1; showResult('done', 'LEVEL SELESAI!', 'Level ' + (level + 1) + ' \u00b7 ' + lv.name + ' \u2014 bintang didapat!', st, 'Level berikutnya \u25B6'); }
+  else { nextN = 0; const fin = runScore; runScore = 0; showResult('done', 'TAMAT! \uD83C\uDFC6', 'Semua 3 bintang berhasil didapat', [['Total skor', fin], ['Terbaik', bestScore]], 'Main dari awal'); }
+}
+function collect() {   // ambil koin & item di dekat motor (juga saat di dalam loop)
+  for (let i = lowerBound(items, b.x - 50); i < items.length && items[i].x < b.x + 50; i++) {
+    const it = items[i]; if (it.got) continue;
+    if (Math.min(Math.hypot(it.x - b.x, it.y - b.y), Math.hypot(it.x - b.x, it.y - (b.y - 34))) > (it.t === 'c' ? 34 : it.t === 'big' ? 54 : 46)) continue;   // roda atau badan pengendara
+    it.got = 1;
+    if (it.t === 'c') { bonus += 10; Sfx.coin(); }
+    else if (it.t === 'big') { bonus += 100; Sfx.coin(); pop('KOIN BESAR  +100'); }
+    else if (it.t === 'jump') { if (jumps) bonus += 300; jumps = 1; Sfx.pick(); pop('LOMPAT TINGGI SIAP!  (tombol J)'); }
+    else if (it.t === 'nos') { nitro = Math.min(100, nitro + 35); if (nitro >= 100) rech = false; Sfx.pick(); pop('NOS  +35'); }
+    else { lives = Math.min(5, lives + 1); Sfx.pick(); pop('NYAWA  +1'); }
+  }
+}
+function doJump() {   // lompatan tinggi 1x untuk freestyle
+  if (state !== 'play' || paused || lp || jumps < 1 || !b.g) return;
+  jumps = 0; hj = true; b.g = false; b.vy = -640; b.vx = Math.max(b.vx, 280); b.y -= 6; airT = 0; Sfx.jump(); pop('LOMPAT TINGGI!  Lakukan freestyle!'); hud();
 }
 function stepLoop(dt) {
   const z = lp.z, T2 = 2 * Math.PI; lp.v = Math.max(lp.v - 25 * dt, 220); lp.th += lp.v / z.r * dt;
   const t = Math.min(lp.th, T2);
   b.x = z.ex + z.r * Math.sin(t) + 46 * t / T2; b.y = z.y0 - R - z.r * (1 - Math.cos(t)); b.a = -t; b.wr += lp.v / R * dt; b.vx = lp.v; b.vy = 0;
+  collect();
   if (lp.th >= T2) { b.x = z.ex + 46; b.y = z.y0 - R; b.a = 0; b.vx = lp.v; b.g = true; b.av = 0; airRot = 0; lp = null; bonus += 300; pop('LOOP!  +300'); Sfx.land(); }
 }
 
@@ -184,9 +209,9 @@ function update(dt) {
   if (state === 'play') time += dt;
   if (invul > 0) invul -= dt;
   if (nitro <= 0) rech = true;
-  const nosOn = !dead && K.nos && nitro > 0 && (!rech || nitro >= 40);
+  const nosOn = !dead && K.nos && nitro > 0 && !rech;
   if (nosOn) nitro = Math.max(0, nitro - 35 * dt);
-  else if (rech && !dead) { nitro = Math.min(100, nitro + 4 * dt); if (nitro >= 100) rech = false; }   // isi ulang otomatis, lambat
+  else if (rech && !dead) { nitro = Math.min(100, nitro + 5 * dt); if (nitro >= 100) rech = false; }   // isi ulang otomatis, lambat
   const zc = zoneAt(b.x);
   bx = b.x; bload += ((zc && zc.t === 'bridge' && b.g && !dead ? 14 : 0) - bload) * Math.min(1, 5 * dt);
   if (lp) { stepLoop(dt); hud(); return; }
@@ -222,7 +247,8 @@ function update(dt) {
         if (Math.abs(angDiff(b.a, sl)) > 1.05) crash();
         else {
           Sfx.land(); suspV += clamp(-away / 55, 0, 16);
-          if (trickT > .3 && style === '3d') { bonus += 150; pop('FREESTYLE  +150'); }
+          if (hj) { hj = false; if (trickT > .5) { bonus += 1500; pop('FREESTYLE BESAR!  +1500'); Sfx.win(); } }
+          else if (trickT > .3 && style === '3d') { bonus += 150; pop('FREESTYLE  +150'); }
           const fl = Math.floor(Math.abs(airRot) / 5.9); if (fl) { bonus += 300 * fl; pop('SALTO x' + fl + '  +' + 300 * fl); }
         }
       }
@@ -242,7 +268,7 @@ function update(dt) {
   if (b.g && !dead) { const s2 = slopeAt(b.x); if (prevSl !== null) F = clamp(-(s2 - prevSl) / Math.max(dt, .001) * Math.hypot(b.vx, b.vy) * .09, -60, 90); prevSl = s2; } else prevSl = null;
   suspV += (-180 * susp - 11 * suspV + F) * dt; susp = clamp(susp + suspV * dt, -.5, 1.3);
   airT = b.g ? 0 : airT + dt;
-  trick += ((!dead && !b.g && airT > .3 && air > 85 ? 1 : 0) - trick) * Math.min(1, 8 * dt);
+  trick += ((!dead && !b.g && (hj ? (air > 75 || b.vy < 0) : (airT > .3 && air > 85)) ? 1 : 0) - trick) * Math.min(1, 8 * dt);
   if (trick > .7) trickT += dt; else if (b.g) trickT = 0;
   crouch += ((b.g ? .12 + Math.max(0, susp) * .8 : .25) - crouch) * Math.min(1, 12 * dt);
   rLean += (lean - rLean) * Math.min(1, 10 * dt);
@@ -270,20 +296,13 @@ function update(dt) {
       if (bn) { bonus += bn; pop('LEWAT!  +' + bn); }
       if (zi < zones.length) cpX = Math.max(z.x1 + 60, zones[zi].x0 - 350);
     }
-    for (let i = lowerBound(items, b.x - 50); i < items.length && items[i].x < b.x + 50; i++) {
-      const it = items[i]; if (it.got || Math.hypot(it.x - b.x, it.y - b.y) > (it.t === 'c' ? 30 : 42)) continue;
-      it.got = 1;
-      if (it.t === 'c') { bonus += 10; Sfx.coin(); }
-      else if (it.t === 'big') { bonus += 100; Sfx.coin(); pop('KOIN BESAR  +100'); }
-      else if (it.t === 'nos') { nitro = Math.min(100, nitro + 35); if (nitro >= 100) rech = false; Sfx.pick(); pop('NOS  +35'); }
-      else { lives = Math.min(5, lives + 1); Sfx.pick(); pop('NYAWA  +1'); }
-    }
+    collect();
     if (b.x >= GOAL) finish();
     Sfx.engine(Math.abs(b.vx) / MAXV, K.gas, nosOn);
   }
   if (dead) {
     endTimer -= dt;
-    if (endTimer <= 0) { if (lives > 0) respawn(); else { state = 'over'; nextN = level; saveBest(); showOverlay('Game over!', 'Nyawa habis. Skor ' + (runScore + total()), 'Ulangi level'); } }
+    if (endTimer <= 0) { if (lives > 0) respawn(); else { state = 'over'; nextN = level; saveBest(); showResult('over', 'GAME OVER', 'Nyawa habis di Level ' + (level + 1) + ' \u00b7 ' + lv.name, [['Skor', runScore + total()], ['Terbaik', bestScore]], 'Ulangi level'); } }
   }
   parts.forEach(p => { if (!p.f) p.vy += GRAV * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * (p.f ? 2.2 : .8); });
   parts = parts.filter(p => p.life > 0);
@@ -442,7 +461,7 @@ function bikeArt(noRider) {
   if (noRider) return;
   const tr = trick, cr = crouch, bob = Math.sin(performance.now() / 1000 * 11) * Math.min(1, Math.abs(b.vx) / 500) * (b.g ? 1 : 0);
   const H = [H0[0] + ox + cr * (NN[0] * 55 - U[0] * 14) + tr * (U[0] * 35 - NN[0] * 25), H0[1] + oy + cr * (NN[1] * 55 - U[1] * 14) + tr * (U[1] * 35 - NN[1] * 25) + bob * 6];
-  const A = [A0[0] + ox + tr * (-U[0] * 220 - NN[0] * 110), A0[1] + oy + tr * (-U[1] * 220 - NN[1] * 110)];   // freestyle: kaki terjulur ke belakang
+  const wb = hj ? Math.sin(airT * 9) * 60 * tr : 0, A = [A0[0] + ox + tr * (-U[0] * 220 - NN[0] * 110) - NN[0] * wb, A0[1] + oy + tr * (-U[1] * 220 - NN[1] * 110) - NN[1] * wb];   // freestyle: kaki terjulur ke belakang
   riderArt(H, A, [G0[0] + ox, G0[1] + oy], rLean * .18 + cr * .3 + tr * .35 + bob * .02, -tr * .9);
 }
 function drawRag() {                                     // pengendara terlempar (ragdoll sederhana)
@@ -635,6 +654,9 @@ function itemArt(it) {
     if (it.t === 'nos') {
       ctx.fillStyle = '#2f8fe0'; ctx.strokeStyle = '#123a66'; ctx.lineWidth = 2; ctx.fillRect(-10, -16, 20, 32); ctx.strokeRect(-10, -16, 20, 32); ctx.fillStyle = '#9fd4ff'; ctx.fillRect(-5, -20, 10, 5);
       ctx.fillStyle = '#ffe14a'; ctx.beginPath(); ctx.moveTo(2, -10); ctx.lineTo(-5, 2); ctx.lineTo(0, 2); ctx.lineTo(-2, 12); ctx.lineTo(6, -2); ctx.lineTo(1, -2); ctx.closePath(); ctx.fill();
+    } else if (it.t === 'jump') {
+      const g = ctx.createLinearGradient(0, -16, 0, 16); g.addColorStop(0, '#ffe663'); g.addColorStop(1, '#ff8f1f'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 17, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(-7, 1); ctx.lineTo(0, -6); ctx.lineTo(7, 1); ctx.moveTo(-7, 9); ctx.lineTo(0, 2); ctx.lineTo(7, 9); ctx.stroke();
     } else { ctx.fillStyle = '#e8283c'; ctx.strokeStyle = '#7a0c1c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 12); ctx.bezierCurveTo(-24, -4, -12, -22, 0, -8); ctx.bezierCurveTo(12, -22, 24, -4, 0, 12); ctx.fill(); ctx.stroke(); }
   });
   blit(sp, x, y, 1, 1);
@@ -710,17 +732,19 @@ addEventListener('keydown', e => {
   const k = map[e.key.length === 1 ? e.key.toLowerCase() : e.key];
   if (k) { K[k] = 1; e.preventDefault(); }
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { setPause(!paused); return; }
+  if (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') { doJump(); return; }
   if ((e.key === 'r' || e.key === 'R') && state !== 'menu') start(level);
   if ((e.key === 'Enter' || e.key === ' ') && $('overlay').classList.contains('show')) { e.preventDefault(); start(nextN); }
 });
 addEventListener('keyup', e => { const k = map[e.key.length === 1 ? e.key.toLowerCase() : e.key]; if (k) K[k] = 0; });
 document.querySelectorAll('#touch button').forEach(el => {
-  const k = el.dataset.k, on = v => e => { e.preventDefault(); K[k] = v; el.classList.toggle('on', !!v); };
+  const k = el.dataset.k, on = v => e => { e.preventDefault(); if (k === 'jump') { if (v) doJump(); } else K[k] = v; el.classList.toggle('on', !!v); };
   el.addEventListener('pointerdown', on(1)); el.addEventListener('pointerup', on(0)); el.addEventListener('pointercancel', on(0)); el.addEventListener('pointerleave', on(0));
   el.addEventListener('contextmenu', e => e.preventDefault());
 });
 $('play').addEventListener('click', () => start(nextN));
 $('pause').addEventListener('click', () => setPause(true));
+$('menubtn').addEventListener('click', showMenu);
 $('resume').addEventListener('click', () => setPause(false));
 $('restart').addEventListener('click', () => start(level));
 $('mute').addEventListener('click', () => { $('mute').textContent = Sfx.toggleMute() ? '\uD83D\uDD07' : '\uD83D\uDD0A'; });
