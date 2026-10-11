@@ -10,43 +10,46 @@
 <canvas id="game"></canvas>
 
 <div id="hud">
-  <div class="stat"><span id="time">0.0</span> dtk</div>
-  <div class="stat sc"><span id="score">0</span> poin</div>
+  <div class="stat"><span id="time">0.0</span><small>dtk</small></div>
+  <div class="stat"><span id="score">0</span><small>poin</small></div>
   <div class="bar"><i id="prog"></i></div>
-  <button id="pause" aria-label="Paus">❚❚</button>
-  <button id="mute" aria-label="Suara">🔊</button>
+  <button id="pause" class="hb" aria-label="Paus"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg></button>
+  <button id="mute" class="hb" aria-label="Suara">🔊</button>
+  <div id="side">
+    <div id="nos"><i id="nosbar"></i><span id="noslab">NOS</span></div>
+    <div id="lvname"></div>
+    <div id="lives"></div>
+    <div id="jumpind">▲ LOMPAT TINGGI SIAP · tekan J</div>
+  </div>
 </div>
-
-<div id="nos"><i id="nosbar"></i><span>NOS</span></div>
-<div id="lvname"></div>
-<div id="lives"></div>
 <div id="pop"></div>
 
 <div id="pausebox">
   <h2>PAUS</h2>
-  <button id="resume">Lanjutkan</button>
-  <button id="restart">Ulangi</button>
+  <button id="resume" class="btn">Lanjutkan</button>
+  <button id="restart" class="btn alt">Ulangi level</button>
 </div>
 
-<div id="overlay" class="show">
-  <h1><span>MOTO</span> <b>BEACH</b> <em>X</em></h1>
-  <p id="msg">Lewati gundukan, ranjau, jembatan goyang, lumpur, jalan bergerigi, bebatuan, dan loop. Kumpulkan koin, NOS, dan nyawa. Selesaikan 3 bintang!</p>
-  <p id="best"></p>
-  <div class="row"><button id="style" class="ghost">Tampilan: 3D</button><button id="quality" class="ghost">Grafik: Tinggi</button></div>
+<div id="overlay" class="show" data-mode="menu">
+  <h1 id="logo"><span>MOTO</span> <b>BEACH</b> <em>X</em></h1>
+  <div id="result"><h2 id="rtitle"></h2><p id="rsub"></p><div id="rstats"></div></div>
+  <p id="msg">Lewati gundukan, ranjau, jembatan goyang, lumpur, jalan bergerigi, bebatuan, dan loop. Kumpulkan koin, NOS, nyawa, dan bonus lompat tinggi. Selesaikan 3 bintang!</p>
+  <div class="row opts"><button id="style" class="ghost">Tampilan: 3D</button><button id="quality" class="ghost">Grafik: Tinggi</button></div>
   <div id="levels"></div>
-  <button id="play">Main</button>
-  <small class="keys">Panah / WASD: gas, rem, miring &nbsp;|&nbsp; Spasi / Shift: NOS &nbsp;|&nbsp; R: ulangi</small>
+  <div class="row"><button id="play" class="btn">Main</button><button id="menubtn" class="btn alt">Menu</button></div>
+  <small class="keys">Panah / WASD: gas, mundur, miring &nbsp;·&nbsp; Spasi / Shift: NOS &nbsp;·&nbsp; J: lompat tinggi &nbsp;·&nbsp; P: paus &nbsp;·&nbsp; R: ulangi</small>
 </div>
 
 <div id="touch">
   <div class="grp">
-    <button data-k="back" aria-label="Miring belakang">⟲</button>
-    <button data-k="fwd" aria-label="Miring depan">⟳</button>
+    <button class="ctl c-lean" data-k="back" aria-label="Miring ke belakang"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg></button>
+    <button class="ctl c-lean" data-k="fwd" aria-label="Miring ke depan"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg></button>
   </div>
-  <div class="grp">
-    <button data-k="brake" aria-label="Rem">REM</button>
-    <button data-k="nos" class="nosbtn" aria-label="NOS">NOS</button>
-    <button data-k="gas" class="gas" aria-label="Gas">GAS</button>
+  <div class="grp r">
+    <button class="ctl c-jump off" data-k="jump" aria-label="Lompat tinggi"><svg viewBox="0 0 24 24"><path d="M6 11l6-6 6 6M6 19l6-6 6 6"/></svg></button>
+    <button class="ctl c-rev" data-k="brake" aria-label="Mundur"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+    <button class="ctl c-nos" data-k="nos" aria-label="NOS"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><span>NOS</span></button>
+    <button class="ctl c-gas" data-k="gas" aria-label="Gas"><svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg><span>GAS</span></button>
   </div>
 </div>
 
